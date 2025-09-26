@@ -180,14 +180,18 @@ export async function markAttendance(qrCode: string, clerkUserId: string) {
     }
 
     // const currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMinute = currentTime.getMinutes();
+    const now = new Date(); // server time
+const hour = now.getHours();
+const minute = now.getMinutes();
 
-    // Morning cutoff: 8:30 AM
-    const isOnTimeMorning = currentHour < 8 || (currentHour === 8 && currentMinute <= 30);
+// Example: on-time before 8:30
+const isOnTime = hour < 8 || (hour === 8 && minute <= 30);
 
-    let pointsAwarded;
-    if (isOnTimeMorning) {
+let pointsAwarded = isOnTime ? 50 : 25;
+
+
+    // let pointsAwarded;
+    if (isOnTime) {
       pointsAwarded = 50;
     } else {
       pointsAwarded = 25;
@@ -210,13 +214,13 @@ export async function markAttendance(qrCode: string, clerkUserId: string) {
     // Record attendance
     await connection.execute(
       'INSERT INTO attendance (sevak_id, clerk_user_id, attendance_date, check_in_time, points_awarded, is_on_time) VALUES (?, ?, ?, ?, ?, ?)',
-      [sevak.id, clerkUserId, today, checkInTime, pointsAwarded, isOnTimeMorning]
+      [sevak.id, clerkUserId, today, checkInTime, pointsAwarded, isOnTime]
     );
 
     // Record transaction
     await connection.execute(
       'INSERT INTO transactions (sevak_id, clerk_user_id, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [sevak.id, clerkUserId, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTimeMorning ? 'On time' : 'Late'} (+${pointsAwarded} points)`]
+      [sevak.id, clerkUserId, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`]
     );
 
     await connection.commit();
@@ -224,7 +228,7 @@ export async function markAttendance(qrCode: string, clerkUserId: string) {
       success: true,
       newPoints,
       previousPoints: sevak.points,
-      isOnTimeMorning,
+      isOnTime,
       pointsAwarded,
       checkInTime
     };
