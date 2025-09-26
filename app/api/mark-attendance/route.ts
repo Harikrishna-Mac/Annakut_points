@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       previousPoints: result.previousPoints,
       newPoints: result.newPoints,
       pointsAwarded: result.pointsAwarded,
-      isOnTime: result.isOnTime,
+      isOnTime: result.isOnTimeMorning,
       checkInTime: result.checkInTime
     });
     

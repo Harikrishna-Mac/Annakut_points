@@ -168,7 +168,7 @@ export async function markAttendance(qrCode: string, clerkUserId: string) {
     const today = new Date().toISOString().split('T')[0];
     const currentTime = new Date();
     const checkInTime = currentTime.toTimeString().split(' ')[0];
-    
+
     // Check if already marked attendance today
     const [existingAttendance] = await connection.execute(
       'SELECT id FROM attendance WHERE sevak_id = ? AND attendance_date = ?',
@@ -179,11 +179,25 @@ export async function markAttendance(qrCode: string, clerkUserId: string) {
       throw new Error('Attendance already marked for today');
     }
 
-    // Check if on time (before 8:30 AM)
-    const cutoffTime = new Date();
-    cutoffTime.setHours(8, 30, 0, 0);
-    const isOnTime = currentTime <= cutoffTime;
-    const pointsAwarded = isOnTime ? 50 : 25;
+    // const currentTime = new Date();
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+
+    // Morning cutoff: 8:30 AM
+    const isOnTimeMorning = currentHour < 8 || (currentHour === 8 && currentMinute <= 30);
+
+    let pointsAwarded;
+    if (isOnTimeMorning) {
+      pointsAwarded = 50;
+    } else {
+      pointsAwarded = 25;
+    }
+
+    // // Check if on time (before 8:30 AM)
+    // const cutoffTime = new Date();
+    // cutoffTime.setHours(8, 30, 0, 0);
+    // const isOnTime = currentTime <= cutoffTime;
+    // const pointsAwarded = isOnTime ? 50 : 25;
 
     const newPoints = sevak.points + pointsAwarded;
 
@@ -196,23 +210,23 @@ export async function markAttendance(qrCode: string, clerkUserId: string) {
     // Record attendance
     await connection.execute(
       'INSERT INTO attendance (sevak_id, clerk_user_id, attendance_date, check_in_time, points_awarded, is_on_time) VALUES (?, ?, ?, ?, ?, ?)',
-      [sevak.id, clerkUserId, today, checkInTime, pointsAwarded, isOnTime]
+      [sevak.id, clerkUserId, today, checkInTime, pointsAwarded, isOnTimeMorning]
     );
 
     // Record transaction
     await connection.execute(
       'INSERT INTO transactions (sevak_id, clerk_user_id, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [sevak.id, clerkUserId, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`]
+      [sevak.id, clerkUserId, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTimeMorning ? 'On time' : 'Late'} (+${pointsAwarded} points)`]
     );
 
     await connection.commit();
-    return { 
-      success: true, 
-      newPoints, 
-      previousPoints: sevak.points, 
-      isOnTime, 
+    return {
+      success: true,
+      newPoints,
+      previousPoints: sevak.points,
+      isOnTimeMorning,
       pointsAwarded,
-      checkInTime 
+      checkInTime
     };
   } catch (error) {
     await connection.rollback();
