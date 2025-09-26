@@ -24,3 +24,73 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Camera select dropdown */
+#html5-qrcode-select-camera {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1; /* light gray */
+  font-size: 14px;
+  color: #1e293b; /* dark slate */
+  outline: none;
+  background-color: #f8fafc;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#html5-qrcode-select-camera:focus {
+  border-color: #3b82f6; /* blue focus */
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Start and Stop buttons */
+#html5-qrcode-button-camera-start,
+#html5-qrcode-button-camera-stop {
+  padding: 8px 16px;
+  font-size: 14px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  color: white;
+}
+
+/* Start button */
+#html5-qrcode-button-camera-start {
+  margin-top: 1rem;
+  background-color: #3b82f6; /* blue */
+}
+
+#html5-qrcode-button-camera-start:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+/* Stop button */
+#html5-qrcode-button-camera-stop {
+  margin-top: 1rem;
+  background-color: #ef4444; /* red */
+}
+
+#html5-qrcode-button-camera-stop:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* Disabled state */
+#html5-qrcode-select-camera:disabled,
+#html5-qrcode-button-camera-start:disabled,
+#html5-qrcode-button-camera-stop:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Optional: container styling */
+#qr-reader__dashboard_section_csr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}

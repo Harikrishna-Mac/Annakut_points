@@ -363,6 +363,7 @@ import Link from 'next/link';
 declare global {
   interface Window {
     Html5QrcodeScanner: any;
+    Html5Qrcode: any;
   }
 }
 
@@ -393,68 +394,126 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const startScanner = async (type: 'add' | 'deduct') => {
-    setScanType(type);
-    setIsScanning(true);
-    setMessage('');
+  // const startScanner = async (type: 'add' | 'deduct') => {
+  //   setScanType(type);
+  //   setIsScanning(true);
+  //   setMessage('');
 
-    // capture current type so it won’t reset when stopScanner runs
-    const currentType = type;
+  //   // capture current type so it won’t reset when stopScanner runs
+  //   const currentType = type;
 
-    setTimeout(() => {
-      if (typeof window !== 'undefined' && window.Html5QrcodeScanner) {
-        try {
-          const html5QrcodeScanner = new window.Html5QrcodeScanner(
-            'qr-reader',
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-              rememberLastUsedCamera: true,
-              supportedScanTypes: [0],
-            },
-            false
-          );
+  //   setTimeout(() => {
+  //     if (typeof window !== 'undefined' && window.Html5QrcodeScanner) {
+  //       try {
+  //         const html5QrcodeScanner = new window.Html5QrcodeScanner(
+  //           'qr-reader',
+  //           {
+  //             fps: 10,
+  //             qrbox: { width: 250, height: 250 },
+  //             rememberLastUsedCamera: true,
+  //             supportedScanTypes: [0],
+  //           },
+  //           false
+  //         );
 
-          qrScannerRef.current = html5QrcodeScanner;
+  //         qrScannerRef.current = html5QrcodeScanner;
 
-          html5QrcodeScanner.render(
-            (decodedText: string) => {
-              console.log('QR Code detected:', decodedText);
-              handleScan(decodedText, currentType); // ✅ pass type directly
-            },
-            (errorMessage: string) => {
-              console.debug('QR scan error:', errorMessage);
-            }
-          );
-        } catch (error) {
-          console.error('Error starting QR scanner:', error);
-          setMessage(
-            '❌ Unable to start camera. Please allow camera permissions and try again.'
-          );
-          setIsScanning(false);
-        }
-      } else {
-        setMessage('❌ QR scanner library not loaded. Please refresh the page.');
+  //         html5QrcodeScanner.render(
+  //           (decodedText: string) => {
+  //             console.log('QR Code detected:', decodedText);
+  //             handleScan(decodedText, currentType); // ✅ pass type directly
+  //           },
+  //           (errorMessage: string) => {
+  //             console.debug('QR scan error:', errorMessage);
+  //           }
+  //         );
+  //       } catch (error) {
+  //         console.error('Error starting QR scanner:', error);
+  //         setMessage(
+  //           '❌ Unable to start camera. Please allow camera permissions and try again.'
+  //         );
+  //         setIsScanning(false);
+  //       }
+  //     } else {
+  //       setMessage('❌ QR scanner library not loaded. Please refresh the page.');
+  //       setIsScanning(false);
+  //     }
+  //   }, 100);
+  // };
+
+  // const stopScanner = () => {
+  //   if (qrScannerRef.current) {
+  //     qrScannerRef.current
+  //       .clear()
+  //       .then(() => {
+  //         qrScannerRef.current = null;
+  //         console.log('Scanner stopped successfully');
+  //       })
+  //       .catch((error: any) => {
+  //         console.error('Error stopping scanner:', error);
+  //       });
+  //   }
+  //   setIsScanning(false);
+  //   setScanType(null);
+  // };
+
+ const startScanner = (type: 'add' | 'deduct') => {
+  setScanType(type);
+  setIsScanning(true);
+  setMessage('');
+
+  const currentType = type;
+
+  const tryStart = () => {
+    const qrElement = document.getElementById("qr-reader");
+    if (!qrElement) {
+      // retry in next frame until element exists
+      requestAnimationFrame(tryStart);
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.Html5Qrcode) {
+      try {
+        const html5Qrcode = new window.Html5Qrcode("qr-reader");
+        qrScannerRef.current = html5Qrcode;
+
+        html5Qrcode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText: string) => handleScan(decodedText, currentType),
+          (errorMessage: string) => console.debug("QR scan error:", errorMessage)
+        );
+      } catch (err) {
+        console.error("Camera failed to start:", err);
+        setMessage("❌ Unable to access camera. Please allow permissions.");
         setIsScanning(false);
       }
-    }, 100);
+    } else {
+      setMessage("❌ QR scanner library not loaded. Please refresh the page.");
+      setIsScanning(false);
+    }
   };
 
-  const stopScanner = () => {
-    if (qrScannerRef.current) {
-      qrScannerRef.current
-        .clear()
-        .then(() => {
-          qrScannerRef.current = null;
-          console.log('Scanner stopped successfully');
-        })
-        .catch((error: any) => {
-          console.error('Error stopping scanner:', error);
-        });
+  tryStart(); // start trying immediately
+};
+
+
+
+const stopScanner = async () => {
+  if (qrScannerRef.current) {
+    try {
+      await qrScannerRef.current.stop();
+      await qrScannerRef.current.clear();
+      qrScannerRef.current = null;
+      console.log("Scanner stopped successfully");
+    } catch (error) {
+      console.error("Error stopping scanner:", error);
     }
-    setIsScanning(false);
-    setScanType(null);
-  };
+  }
+  setIsScanning(false);
+  setScanType(null);
+};
+
 
   const handleScan = async (qrData: string, action: 'add' | 'deduct') => {
     if (!qrData || isLoading) return;
@@ -510,7 +569,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
-                🕉️ Annakut Point System
+                Annakut Point System
               </h1>
               <p className="text-slate-600">
                 Welcome, {user?.firstName} • Role:{' '}
@@ -629,7 +688,7 @@ export default function DashboardPage() {
         )}
 
         {/* Welcome Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-white/20">
+        {/* <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-white/20">
           <div className="text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
               <span className="text-3xl">🙏</span>
@@ -642,7 +701,7 @@ export default function DashboardPage() {
               contribution counts towards our spiritual journey.
             </p>
           </div>
-        </div>
+        </div> */}
 
         {/* Action Buttons */}
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">

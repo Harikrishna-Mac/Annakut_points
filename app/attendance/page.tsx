@@ -46,66 +46,61 @@ export default function AttendancePage() {
   }, []);
 
   const startScanner = () => {
-    setIsScanning(true);
-    setMessage("");
+  // setScanType(type);
+  setIsScanning(true);
+  setMessage('');
 
-    // Wait a bit for the DOM to update and the qr-reader div to be available
-    setTimeout(() => {
-      if (typeof window !== "undefined" && window.Html5QrcodeScanner) {
-        try {
-          const html5QrcodeScanner = new window.Html5QrcodeScanner(
-            "qr-reader",
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-              rememberLastUsedCamera: true,
-              supportedScanTypes: [0] // Only camera scanning, no file upload
-            },
-            false
-          );
+  // const currentType = type;
 
-          qrScannerRef.current = html5QrcodeScanner;
+  const tryStart = () => {
+    const qrElement = document.getElementById("qr-reader");
+    if (!qrElement) {
+      // retry in next frame until element exists
+      requestAnimationFrame(tryStart);
+      return;
+    }
 
-          html5QrcodeScanner.render(
-            (decodedText: string) => {
-              console.log("QR Code detected:", decodedText);
-              // Handle successful scan
-              handleScan(decodedText);
-              html5QrcodeScanner.clear();
-            },
-            (errorMessage: string) => {
-              // Handle scan error (this is normal, happens when no QR is detected)
-              console.debug("QR scan error:", errorMessage);
-            }
-          );
-        } catch (error) {
-          console.error("Error starting QR scanner:", error);
-          setMessage(
-            "❌ Unable to start camera. Please allow camera permissions and try again."
-          );
-          setIsScanning(false);
-        }
-      } else {
-        setMessage("❌ QR scanner library not loaded. Please refresh the page.");
+    if (typeof window !== 'undefined' && window.Html5Qrcode) {
+      try {
+        const html5Qrcode = new window.Html5Qrcode("qr-reader");
+        qrScannerRef.current = html5Qrcode;
+
+        html5Qrcode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText: string) => handleScan(decodedText),
+          (errorMessage: string) => console.debug("QR scan error:", errorMessage)
+        );
+      } catch (err) {
+        console.error("Camera failed to start:", err);
+        setMessage("❌ Unable to access camera. Please allow permissions.");
         setIsScanning(false);
       }
-    }, 100);
+    } else {
+      setMessage("❌ QR scanner library not loaded. Please refresh the page.");
+      setIsScanning(false);
+    }
   };
 
-  const stopScanner = () => {
-    if (qrScannerRef.current) {
-      qrScannerRef.current
-        .clear()
-        .then(() => {
-          qrScannerRef.current = null;
-          console.log("Scanner stopped successfully");
-        })
-        .catch((error: any) => {
-          console.error("Error stopping scanner:", error);
-        });
+  tryStart(); // start trying immediately
+};
+
+
+
+const stopScanner = async () => {
+  if (qrScannerRef.current) {
+    try {
+      await qrScannerRef.current.stop();
+      await qrScannerRef.current.clear();
+      qrScannerRef.current = null;
+      console.log("Scanner stopped successfully");
+    } catch (error) {
+      console.error("Error stopping scanner:", error);
     }
-    setIsScanning(false);
-  };
+  }
+  setIsScanning(false);
+  // setScanType(null);
+};
 
   const handleScan = async (qrData: string) => {
     if (!qrData || isLoading) return;
@@ -167,7 +162,7 @@ export default function AttendancePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
-                🕉️ Annakut Point System
+                Annakut Point System
               </h1>
               <p className="text-slate-600">
                 Welcome, {user?.firstName} • Role:{" "}
@@ -288,6 +283,7 @@ export default function AttendancePage() {
           </div>
         )}
 
+
         {/* Time Info Card */}
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-white/20">
           <div className="text-center">
@@ -319,6 +315,21 @@ export default function AttendancePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        
+        {/* Scan Button */}
+        <div className="text-center m-7">
+          <button
+            onClick={startScanner}
+            disabled={isLoading || isScanning}
+            className="inline-flex items-center px-12 py-6 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xl rounded-3xl shadow-2xl hover:shadow-3xl transform transition-all duration-300 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed space-x-4"
+          >
+            <span className="text-3xl">📱</span>
+            <span>
+              {isScanning ? "Scanner Active..." : "Scan QR for Attendance"}
+            </span>
+          </button>
         </div>
 
         {/* Attendance Rules Card */}
@@ -380,19 +391,7 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* Scan Button */}
-        <div className="text-center">
-          <button
-            onClick={startScanner}
-            disabled={isLoading || isScanning}
-            className="inline-flex items-center px-12 py-6 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xl rounded-3xl shadow-2xl hover:shadow-3xl transform transition-all duration-300 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed space-x-4"
-          >
-            <span className="text-3xl">📱</span>
-            <span>
-              {isScanning ? "Scanner Active..." : "Scan QR for Attendance"}
-            </span>
-          </button>
-        </div>
+        
 
         {/* Help Section */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-2xl p-6">
