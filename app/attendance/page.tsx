@@ -323,7 +323,7 @@ export default function AttendancePage() {
               >
                 <span className="text-3xl">📱</span>
                 <span>
-                  {isScanning ? "Scanner Active..." : "Scan QR for Attendance"}
+                  {isScanning ? "Scanner Active..." : "Scan QR"}
                 </span>
               </button>
             </div>
