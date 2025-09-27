@@ -759,20 +759,6 @@ const stopScanner = async () => {
             </button>
           </div>
         </div>
-
-        {/* Help Section */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-2xl p-6">
-          <h4 className="font-semibold text-blue-800 mb-3">
-            🔧 Troubleshooting
-          </h4>
-          <div className="space-y-2 text-sm text-blue-700">
-            <p>• If camera doesn't start, allow camera permissions in browser</p>
-            <p>• Make sure you're using HTTPS (not HTTP) for camera access</p>
-            <p>• Try refreshing the page if QR scanner doesn't load</p>
-            <p>• Ensure good lighting for better QR code detection</p>
-            <p>• Check browser console for any error messages</p>
-          </div>
-        </div>
       </div>
     </div>
   );

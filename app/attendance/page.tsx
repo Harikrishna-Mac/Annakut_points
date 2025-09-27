@@ -46,61 +46,62 @@ export default function AttendancePage() {
   }, []);
 
   const startScanner = () => {
-  // setScanType(type);
-  setIsScanning(true);
-  setMessage('');
+    // setScanType(type);
+    setIsScanning(true);
+    setMessage("");
 
-  // const currentType = type;
+    // const currentType = type;
 
-  const tryStart = () => {
-    const qrElement = document.getElementById("qr-reader");
-    if (!qrElement) {
-      // retry in next frame until element exists
-      requestAnimationFrame(tryStart);
-      return;
-    }
+    const tryStart = () => {
+      const qrElement = document.getElementById("qr-reader");
+      if (!qrElement) {
+        // retry in next frame until element exists
+        requestAnimationFrame(tryStart);
+        return;
+      }
 
-    if (typeof window !== 'undefined' && window.Html5Qrcode) {
-      try {
-        const html5Qrcode = new window.Html5Qrcode("qr-reader");
-        qrScannerRef.current = html5Qrcode;
+      if (typeof window !== "undefined" && window.Html5Qrcode) {
+        try {
+          const html5Qrcode = new window.Html5Qrcode("qr-reader");
+          qrScannerRef.current = html5Qrcode;
 
-        html5Qrcode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText: string) => handleScan(decodedText),
-          (errorMessage: string) => console.debug("QR scan error:", errorMessage)
+          html5Qrcode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText: string) => handleScan(decodedText),
+            (errorMessage: string) =>
+              console.debug("QR scan error:", errorMessage)
+          );
+        } catch (err) {
+          console.error("Camera failed to start:", err);
+          setMessage("❌ Unable to access camera. Please allow permissions.");
+          setIsScanning(false);
+        }
+      } else {
+        setMessage(
+          "❌ QR scanner library not loaded. Please refresh the page."
         );
-      } catch (err) {
-        console.error("Camera failed to start:", err);
-        setMessage("❌ Unable to access camera. Please allow permissions.");
         setIsScanning(false);
       }
-    } else {
-      setMessage("❌ QR scanner library not loaded. Please refresh the page.");
-      setIsScanning(false);
-    }
+    };
+
+    tryStart(); // start trying immediately
   };
 
-  tryStart(); // start trying immediately
-};
-
-
-
-const stopScanner = async () => {
-  if (qrScannerRef.current) {
-    try {
-      await qrScannerRef.current.stop();
-      await qrScannerRef.current.clear();
-      qrScannerRef.current = null;
-      console.log("Scanner stopped successfully");
-    } catch (error) {
-      console.error("Error stopping scanner:", error);
+  const stopScanner = async () => {
+    if (qrScannerRef.current) {
+      try {
+        await qrScannerRef.current.stop();
+        await qrScannerRef.current.clear();
+        qrScannerRef.current = null;
+        console.log("Scanner stopped successfully");
+      } catch (error) {
+        console.error("Error stopping scanner:", error);
+      }
     }
-  }
-  setIsScanning(false);
-  // setScanType(null);
-};
+    setIsScanning(false);
+    // setScanType(null);
+  };
 
   const handleScan = async (qrData: string) => {
     if (!qrData || isLoading) return;
@@ -283,7 +284,6 @@ const stopScanner = async () => {
           </div>
         )}
 
-
         {/* Time Info Card */}
         <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-white/20">
           <div className="text-center">
@@ -314,96 +314,19 @@ const stopScanner = async () => {
                 {isCurrentlyOnTime ? "🟢 On Time Period" : "🟡 Late Period"}
               </div>
             </div>
-          </div>
-        </div>
-
-        
-        {/* Scan Button */}
-        <div className="text-center m-7">
-          <button
-            onClick={startScanner}
-            disabled={isLoading || isScanning}
-            className="inline-flex items-center px-12 py-6 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xl rounded-3xl shadow-2xl hover:shadow-3xl transform transition-all duration-300 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed space-x-4"
-          >
-            <span className="text-3xl">📱</span>
-            <span>
-              {isScanning ? "Scanner Active..." : "Scan QR for Attendance"}
-            </span>
-          </button>
-        </div>
-
-        {/* Attendance Rules Card */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-white/20">
-          <h3 className="text-xl font-semibold text-slate-800 mb-4 text-center">
-            📋 Attendance Rules
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-green-600 font-bold">50</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-800">
-                  On Time (Before 8:30 AM)
-                </h4>
-                <p className="text-slate-600 text-sm">
-                  Sevaks who arrive before 8:30 AM get full attendance points
-                </p>
-              </div>
+            {/* Scan Button */}
+            <div className="text-center m-7">
+              <button
+                onClick={startScanner}
+                disabled={isLoading || isScanning}
+                className="inline-flex items-center px-12 py-6 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xl rounded-3xl shadow-2xl hover:shadow-3xl transform transition-all duration-300 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed space-x-4"
+              >
+                <span className="text-3xl">📱</span>
+                <span>
+                  {isScanning ? "Scanner Active..." : "Scan QR for Attendance"}
+                </span>
+              </button>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-yellow-600 font-bold">25</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-800">
-                  Late (After 8:30 AM)
-                </h4>
-                <p className="text-slate-600 text-sm">
-                  Sevaks who arrive after 8:30 AM get reduced points
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-blue-600 font-bold">1×</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-800">Once Per Day</h4>
-                <p className="text-slate-600 text-sm">
-                  Each sevak can only mark attendance once per day
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-purple-600 font-bold">📱</span>
-              </div>
-              <div>
-                <h4 className="font-semibold text-slate-800">
-                  QR Code Required
-                </h4>
-                <p className="text-slate-600 text-sm">
-                  Valid sevak QR code must be scanned for attendance
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        
-
-        {/* Help Section */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-2xl p-6">
-          <h4 className="font-semibold text-blue-800 mb-3">
-            🔧 Troubleshooting
-          </h4>
-          <div className="space-y-2 text-sm text-blue-700">
-            <p>• If camera doesn't start, allow camera permissions in browser</p>
-            <p>• Make sure you're using HTTPS (not HTTP) for camera access</p>
-            <p>• Try refreshing the page if QR scanner doesn't load</p>
-            <p>• Ensure good lighting for better QR code detection</p>
-            <p>• Check browser console for any error messages</p>
           </div>
         </div>
       </div>

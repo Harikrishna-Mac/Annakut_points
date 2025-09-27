@@ -397,29 +397,6 @@ Radha Rani`;
             </div>
           </div>
         )}
-
-        {/* Instructions */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-2xl p-6">
-          <h4 className="font-semibold text-blue-800 mb-4">📝 Instructions</h4>
-          <div className="space-y-3 text-sm text-blue-700">
-            <div className="flex items-start space-x-2">
-              <span className="text-blue-500">•</span>
-              <p><strong>Single Sevak:</strong> Enter name and click "Create Sevak" to generate a new sevak with auto-assigned ID (ID-0001, ID-0002, etc.)</p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="text-blue-500">•</span>
-              <p><strong>Bulk Upload:</strong> Use CSV/Excel file with "name" column. Download sample file for reference.</p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="text-blue-500">•</span>
-              <p><strong>Initial Points:</strong> Each new sevak starts with 100 points automatically.</p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="text-blue-500">•</span>
-              <p><strong>QR Codes:</strong> Download QR code after creation for printing on ID cards.</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
