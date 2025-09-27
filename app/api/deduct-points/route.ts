@@ -1,9 +1,11 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { deductPointsFromSevak } from '@/lib/db';
+import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await currentUser();
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
     const result = await deductPointsFromSevak(
       qrCode,
       points,
-      userId,
+      user,
       `Points deducted by inspector via QR scan`
     );
 

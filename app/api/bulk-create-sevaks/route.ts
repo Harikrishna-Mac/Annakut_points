@@ -1,10 +1,12 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { createSevak } from '@/lib/db';
+import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
+    const user = await currentUser();
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json(
@@ -155,7 +157,7 @@ export async function POST(request: NextRequest) {
 
         // Create sevak
         console.log(`Creating sevak: ${name}`);
-        const sevak = await createSevak(name, userId);
+        const sevak = await createSevak(name, user);
         
         results.created.push({
           row: rowNumber,

@@ -1,10 +1,12 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { markAttendance } from '@/lib/db';
+import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
+    const user = await currentUser();
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json(
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark attendance for sevak
-    const result = await markAttendance(qrCode, userId);
+    const result = await markAttendance(qrCode, user);
     
     return NextResponse.json({ 
       success: true, 
