@@ -19,6 +19,7 @@
     "lucide-react": "^0.544.0",
     "mysql2": "^3.15.1",
     "next": "15.5.4",
+    "next-pwa": "^5.6.0",
     "papaparse": "^5.5.3",
     "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
