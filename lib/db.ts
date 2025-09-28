@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import { getAttendancePoints } from './config';
 
 // Database configuration
 const dbConfig = {
@@ -208,11 +209,10 @@ export async function markAttendance(qrCode: string, user: any) {
       throw new Error('Attendance already marked for today');
     }
 
-    // Check if on time (before 8:30 AM)
-    const cutoffTime = new Date();
-    cutoffTime.setHours(8, 30, 0, 0);
-    const isOnTime = currentTime <= cutoffTime;
-    const pointsAwarded = isOnTime ? 50 : 25;
+    // Use centralized config for attendance logic
+    const { points: pointsAwarded, isOnTime } = getAttendancePoints();
+    
+    console.log(`Attendance check: ${currentTime.getHours()}:${currentTime.getMinutes()}, isOnTime: ${isOnTime}, points: ${pointsAwarded}`);
 
     const newPoints = sevak.points + pointsAwarded;
 

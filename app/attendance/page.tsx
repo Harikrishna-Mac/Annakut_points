@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { ATTENDANCE_CONFIG, isOnTimeAttendance, getFormattedCutoffTime } from "@/lib/config";
 
 declare global {
   interface Window {
@@ -46,16 +47,12 @@ export default function AttendancePage() {
   }, []);
 
   const startScanner = () => {
-    // setScanType(type);
     setIsScanning(true);
     setMessage("");
-
-    // const currentType = type;
 
     const tryStart = () => {
       const qrElement = document.getElementById("qr-reader");
       if (!qrElement) {
-        // retry in next frame until element exists
         requestAnimationFrame(tryStart);
         return;
       }
@@ -85,7 +82,7 @@ export default function AttendancePage() {
       }
     };
 
-    tryStart(); // start trying immediately
+    tryStart();
   };
 
   const stopScanner = async () => {
@@ -100,7 +97,6 @@ export default function AttendancePage() {
       }
     }
     setIsScanning(false);
-    // setScanType(null);
   };
 
   const handleScan = async (qrData: string) => {
@@ -140,12 +136,10 @@ export default function AttendancePage() {
     }
   };
 
-  // Get current time info
-  const currentHour = currentTime.getHours();
-  const currentMinute = currentTime.getMinutes();
-  const isCurrentlyOnTime =
-    currentHour < 8 || (currentHour === 8 && currentMinute <= 30);
+  // Use centralized config for time checking
+  const isCurrentlyOnTime = isOnTimeAttendance();
   const timeDisplay = currentTime.toLocaleTimeString();
+  const cutoffTime = getFormattedCutoffTime();
 
   if (!isLoaded) {
     return (
@@ -234,7 +228,6 @@ export default function AttendancePage() {
                 </p>
               </div>
 
-              {/* QR Scanner Container - This is the key fix */}
               <div id="qr-reader" className="mb-6"></div>
 
               <div className="space-y-3">
@@ -313,7 +306,11 @@ export default function AttendancePage() {
               >
                 {isCurrentlyOnTime ? "🟢 On Time Period" : "🟡 Late Period"}
               </div>
+              <p className="text-slate-600 text-sm mt-4">
+                Cutoff Time: <span className="font-semibold">{cutoffTime} AM</span>
+              </p>
             </div>
+            
             {/* Scan Button */}
             <div className="text-center m-7">
               <button
