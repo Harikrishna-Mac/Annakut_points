@@ -18,19 +18,16 @@ export const ATTENDANCE_CONFIG = {
 };
 
 // Helper function to check if current time is on-time
-export function isOnTimeAttendance(): boolean {
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  
-  return currentHour < ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR || 
-         (currentHour === ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR && 
-          currentMinute <= ATTENDANCE_CONFIG.ON_TIME_CUTOFF.MINUTE);
+// Add new function to check time with client's hour and minute
+export function isOnTimeWithClientTime(clientHour: number, clientMinute: number): boolean {
+  return clientHour < ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR || 
+         (clientHour === ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR && 
+          clientMinute <= ATTENDANCE_CONFIG.ON_TIME_CUTOFF.MINUTE);
 }
 
-// Get points for current time
-export function getAttendancePoints(): { points: number; isOnTime: boolean } {
-  const isOnTime = isOnTimeAttendance();
+// Get points based on client time
+export function getAttendancePointsWithClientTime(clientHour: number, clientMinute: number): { points: number; isOnTime: boolean } {
+  const isOnTime = isOnTimeWithClientTime(clientHour, clientMinute);
   return {
     points: isOnTime ? ATTENDANCE_CONFIG.POINTS.ON_TIME : ATTENDANCE_CONFIG.POINTS.LATE,
     isOnTime

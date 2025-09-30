@@ -2,7 +2,11 @@
 import { useState, useRef, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { ATTENDANCE_CONFIG, isOnTimeAttendance, getFormattedCutoffTime } from "@/lib/config";
+import {
+  ATTENDANCE_CONFIG,
+  isOnTimeWithClientTime,
+  getFormattedCutoffTime,
+} from "@/lib/config";
 
 declare global {
   interface Window {
@@ -107,6 +111,14 @@ export default function AttendancePage() {
     stopScanner();
 
     try {
+      // Get client's local time
+      const clientTime = new Date();
+      const clientTimeISO = clientTime.toISOString();
+      const clientHour = clientTime.getHours();
+      const clientMinute = clientTime.getMinutes();
+
+      console.log(`Client time: ${clientHour}:${clientMinute}`);
+
       const response = await fetch("/api/mark-attendance", {
         method: "POST",
         headers: {
@@ -114,6 +126,9 @@ export default function AttendancePage() {
         },
         body: JSON.stringify({
           qrCode: qrData,
+          clientTime: clientTimeISO, // Send client's time
+          clientHour: clientHour, // Send parsed hour
+          clientMinute: clientMinute, // Send parsed minute
         }),
       });
 
@@ -136,8 +151,10 @@ export default function AttendancePage() {
     }
   };
 
-  // Use centralized config for time checking
-  const isCurrentlyOnTime = isOnTimeAttendance();
+  const clientHour = currentTime.getHours();
+  const clientMinute = currentTime.getMinutes();
+  const isCurrentlyOnTime = isOnTimeWithClientTime(clientHour, clientMinute);
+
   const timeDisplay = currentTime.toLocaleTimeString();
   const cutoffTime = getFormattedCutoffTime();
 
@@ -307,10 +324,11 @@ export default function AttendancePage() {
                 {isCurrentlyOnTime ? "🟢 On Time Period" : "🟡 Late Period"}
               </div>
               <p className="text-slate-600 text-sm mt-4">
-                Cutoff Time: <span className="font-semibold">{cutoffTime} AM</span>
+                Cutoff Time:{" "}
+                <span className="font-semibold">{cutoffTime} AM</span>
               </p>
             </div>
-            
+
             {/* Scan Button */}
             <div className="text-center m-7">
               <button
@@ -319,9 +337,7 @@ export default function AttendancePage() {
                 className="inline-flex items-center px-12 py-6 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold text-xl rounded-3xl shadow-2xl hover:shadow-3xl transform transition-all duration-300 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed space-x-4"
               >
                 <span className="text-3xl">📱</span>
-                <span>
-                  {isScanning ? "Scanner Active..." : "Scan QR"}
-                </span>
+                <span>{isScanning ? "Scanner Active..." : "Scan QR"}</span>
               </button>
             </div>
           </div>

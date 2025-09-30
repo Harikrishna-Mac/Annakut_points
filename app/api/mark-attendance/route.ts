@@ -1,32 +1,29 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { markAttendance } from '@/lib/db';
-import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const user = await currentUser();
-    const { userId } = await auth();
-    if (!userId) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Authentication required' }, 
         { status: 401 }
       );
     }
 
-    const { qrCode } = await request.json();
+    const { qrCode, clientTime, clientHour, clientMinute } = await request.json();
     
     // Validate input
-    if (!qrCode) {
+    if (!qrCode || clientHour === undefined || clientMinute === undefined) {
       return NextResponse.json(
-        { error: 'QR code is required' }, 
+        { error: 'QR code and client time are required' }, 
         { status: 400 }
       );
     }
 
-    // Mark attendance for sevak
-    const result = await markAttendance(qrCode, user);
+    // Mark attendance using client's time
+    const result = await markAttendance(qrCode, user, clientHour, clientMinute, clientTime);
     
     return NextResponse.json({ 
       success: true, 

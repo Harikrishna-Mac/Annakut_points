@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import { getAttendancePoints } from './config';
+import { getAttendancePointsWithClientTime } from './config';
 
 // Database configuration
 const dbConfig = {
@@ -182,24 +182,24 @@ export async function deductPointsFromSevak(qrCode: string, points: number, user
 }
 
 // Mark attendance
-export async function markAttendance(qrCode: string, user: any) {
+// Update function signature to accept client time
+export async function markAttendance(qrCode: string, user: any, clientHour: number, clientMinute: number, clientTimeISO: string) {
   const connection = await createDbConnection();
   const userInfo = getUserInfo(user);
   
   try {
     await connection.beginTransaction();
 
-    // Get current sevak data
     const sevak = await getSevakByQRWithConnection(connection, qrCode);
     if (!sevak) {
       throw new Error('Sevak not found');
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const currentTime = new Date();
-    const checkInTime = currentTime.toTimeString().split(' ')[0];
+    // Use client's time for date/time
+    const clientDate = new Date(clientTimeISO);
+    const today = clientDate.toISOString().split('T')[0];
+    const checkInTime = clientDate.toTimeString().split(' ')[0];
     
-    // Check if already marked attendance today
     const [existingAttendance] = await connection.execute(
       'SELECT id FROM attendance WHERE sevak_id = ? AND attendance_date = ?',
       [sevak.id, today]
@@ -209,26 +209,23 @@ export async function markAttendance(qrCode: string, user: any) {
       throw new Error('Attendance already marked for today');
     }
 
-    // Use centralized config for attendance logic
-    const { points: pointsAwarded, isOnTime } = getAttendancePoints();
+    // Use client's time for on-time check
+    const { points: pointsAwarded, isOnTime } = getAttendancePointsWithClientTime(clientHour, clientMinute);
     
-    console.log(`Attendance check: ${currentTime.getHours()}:${currentTime.getMinutes()}, isOnTime: ${isOnTime}, points: ${pointsAwarded}`);
+    console.log(`Attendance check (client time): ${clientHour}:${clientMinute}, isOnTime: ${isOnTime}, points: ${pointsAwarded}`);
 
     const newPoints = sevak.points + pointsAwarded;
 
-    // Update sevak points
     await connection.execute(
       'UPDATE sevaks SET points = ?, updated_at = NOW() WHERE sevak_id = ?',
       [newPoints, qrCode]
     );
 
-    // Record attendance
     await connection.execute(
       'INSERT INTO attendance (sevak_id, user_email, user_name, user_role, attendance_date, check_in_time, points_awarded, is_on_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [sevak.id, userInfo.email, userInfo.name, userInfo.role, today, checkInTime, pointsAwarded, isOnTime]
     );
 
-    // Record transaction
     await connection.execute(
       'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`]
