@@ -4,6 +4,7 @@ const withPWA = require("next-pwa")({
   skipWaiting: true,
 });
 
+/** @type {import('next').NextConfig} */
 const nextConfig = withPWA({
   eslint: {
     ignoreDuringBuilds: true,
@@ -12,6 +13,18 @@ const nextConfig = withPWA({
     ignoreBuildErrors: true,
   },
   reactStrictMode: true,
+
+  // ✅ Needed for Cloudflare Pages deployment
+  output: "standalone",
+
+  // ✅ Cloudflare doesn't support Next.js Image Optimization
+  images: {
+    unoptimized: true,
+    domains: [
+      "firebasestorage.googleapis.com",
+      "img.clerk.com", // 👈 Clerk profile images
+    ],
+  },
 });
 
 module.exports = nextConfig;
