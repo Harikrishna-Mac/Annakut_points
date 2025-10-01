@@ -420,11 +420,11 @@ const HistoryModal: React.FC<HistoryModalProps> = ({
                               {transaction.points_change}
                             </span>
                           </div>
-                          {transaction.description && (
+                          {/* {transaction.description && (
                             <p className="text-sm text-slate-600 mt-1">
                               {transaction.description}
                             </p>
-                          )}
+                          )} */}
                           <div className="text-xs text-slate-500 mt-1">
                             <b>Time:</b>{" "}
                             {formatDate(transaction.device_timestamp)}
