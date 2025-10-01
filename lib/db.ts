@@ -59,7 +59,8 @@ export async function createDbConnection() {
 function getUserInfo(user: any) {
   return {
     email: user.emailAddresses?.[0]?.emailAddress || 'unknown@email.com',
-    name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Unknown User',
+    // name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Unknown User',
+    name: user.username? user.username:'Unknown User',
     role: (user.publicMetadata?.role || 'inspector') as 'admin' | 'inspector'
   };
 }
