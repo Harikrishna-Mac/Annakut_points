@@ -2,14 +2,14 @@
 export const ATTENDANCE_CONFIG = {
   // Time settings (24-hour format)
   ON_TIME_CUTOFF: {
-    HOUR: parseInt(process.env.ATTENDANCE_ON_TIME_HOUR || '8'),
-    MINUTE: parseInt(process.env.ATTENDANCE_ON_TIME_MINUTE || '30')
+    HOUR: parseInt('16'),
+    MINUTE: parseInt('54')
   },
   
   // Points awarded
   POINTS: {
-    ON_TIME: parseInt(process.env.ATTENDANCE_ON_TIME_POINTS || '50'),
-    LATE: parseInt(process.env.ATTENDANCE_LATE_POINTS || '25')
+    ON_TIME: parseInt('50'),
+    LATE: parseInt('25')
   },
   
   // Other attendance settings
