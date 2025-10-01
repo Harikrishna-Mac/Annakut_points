@@ -2,8 +2,8 @@
 export const ATTENDANCE_CONFIG = {
   // Time settings (24-hour format)
   ON_TIME_CUTOFF: {
-    HOUR: parseInt('16'),
-    MINUTE: parseInt('54')
+    HOUR: parseInt('8'),
+    MINUTE: parseInt('30')
   },
   
   // Points awarded
