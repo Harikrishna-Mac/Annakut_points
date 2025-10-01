@@ -336,8 +336,8 @@ export async function createSevak(name: string, user: any, deviceTimeISO: string
       'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         result.insertId, 
-        userInfo.email, 
-        userInfo.name, 
+        "System", 
+        "System", 
         userInfo.role, 
         'INITIAL', 
         100, 
