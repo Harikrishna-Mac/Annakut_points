@@ -11,19 +11,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const { qrCode, points } = await request.json();
+    const { qrCode, points, deviceTime } = await request.json();
+    
     if (!qrCode || !points) {
       return NextResponse.json({ error: 'QR code and points are required' }, { status: 400 });
+    }
+
+    if (!deviceTime) {
+      return NextResponse.json({ error: 'Device time is required' }, { status: 400 });
     }
 
     if (points !== 10) {
       return NextResponse.json({ error: 'Only 10 points can be deducted at a time' }, { status: 400 });
     }
 
+    // Deduct points with device time
     const result = await deductPointsFromSevak(
       qrCode,
       points,
       user,
+      deviceTime,
       `Points deducted by inspector via QR scan`
     );
 

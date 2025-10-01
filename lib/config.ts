@@ -35,8 +35,28 @@ export function getAttendancePointsWithClientTime(clientHour: number, clientMinu
 }
 
 // Format cutoff time for display
+// export function getFormattedCutoffTime(): string {
+//   const hour = ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR;
+//   const minute = ATTENDANCE_CONFIG.ON_TIME_CUTOFF.MINUTE;
+//   const apm = (ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR >= 12)? "AM":"PM";
+//   return `${hour}:${minute.toString().padStart(2, '0')} ${apm}`;
+// }
 export function getFormattedCutoffTime(): string {
-  const hour = ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR;
+  let hour = ATTENDANCE_CONFIG.ON_TIME_CUTOFF.HOUR;
   const minute = ATTENDANCE_CONFIG.ON_TIME_CUTOFF.MINUTE;
-  return `${hour}:${minute.toString().padStart(2, '0')}`;
+
+  const apm = hour >= 12 ? "PM" : "AM";
+
+  // Convert 24-hour → 12-hour
+  if (hour === 0) {
+    hour = 12; // midnight
+  } else if (hour > 12) {
+    hour = hour - 12;
+  }
+
+  // Add leading zeros
+  const formattedHour = hour.toString().padStart(2, "0");
+  const formattedMinute = minute.toString().padStart(2, "0");
+
+  return `${formattedHour}:${formattedMinute} ${apm}`;
 }

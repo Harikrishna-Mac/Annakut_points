@@ -5,7 +5,6 @@ import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const user = await currentUser();
     const { userId } = await auth();
     if (!userId) {
@@ -15,12 +14,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name } = await request.json();
+    const { name, deviceTime } = await request.json();
     
     // Validate input
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Valid name is required' }, 
+        { status: 400 }
+      );
+    }
+
+    if (!deviceTime) {
+      return NextResponse.json(
+        { error: 'Device time is required' }, 
         { status: 400 }
       );
     }
@@ -40,8 +46,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new sevak
-    const sevak = await createSevak(name.trim(), user);
+    // Create new sevak with device time
+    const sevak = await createSevak(name.trim(), user, deviceTime);
     
     return NextResponse.json({ 
       success: true, 
@@ -51,14 +57,13 @@ export async function POST(request: NextRequest) {
         sevak_id: sevak.sevak_id,
         name: sevak.name,
         points: sevak.points,
-        created_at: sevak.created_at
+        device_created_at: sevak.device_created_at
       }
     });
     
   } catch (error: any) {
     console.error('Create sevak error:', error);
     
-    // Handle duplicate name error (if you add unique constraint later)
     if (error.code === 'ER_DUP_ENTRY') {
       return NextResponse.json(
         { error: 'A sevak with this name already exists' }, 

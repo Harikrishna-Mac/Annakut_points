@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import mysql from 'mysql2/promise';
 
-// Database connection configuration
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
@@ -16,7 +15,6 @@ const dbConfig = {
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json(
@@ -25,7 +23,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get sevakId from query parameters
     const { searchParams } = new URL(request.url);
     const sevakId = searchParams.get('sevakId');
 
@@ -36,13 +33,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create database connection
     const connection = await mysql.createConnection(dbConfig);
 
     try {
-      // First, get the sevak's internal ID and current info
+      // Get sevak info - using device timestamps
       const [sevakRows] = await connection.execute(
-        'SELECT id, name, points, created_at FROM sevaks WHERE sevak_id = ? AND is_active = TRUE',
+        'SELECT id, name, points, device_created_at as created_at FROM sevaks WHERE sevak_id = ? AND is_active = TRUE',
         [sevakId]
       ) as [any[], any];
 
@@ -57,7 +53,7 @@ export async function GET(request: NextRequest) {
       const sevakInternalId = sevakRows[0].id;
       const sevakInfo = sevakRows[0];
 
-      // Get transaction history with user info (updated column names)
+      // Get transaction history with device_timestamp
       const [transactionRows] = await connection.execute(
         `SELECT 
           id,
@@ -69,14 +65,14 @@ export async function GET(request: NextRequest) {
           user_email,
           user_name,
           user_role,
-          created_at
+          device_timestamp
         FROM transactions 
         WHERE sevak_id = ? 
-        ORDER BY created_at DESC, id DESC`,
+        ORDER BY device_timestamp DESC, id DESC`,
         [sevakInternalId]
       ) as [any[], any];
 
-      // Get attendance records with user info (updated column names)
+      // Get attendance records with device_timestamp
       const [attendanceRows] = await connection.execute(
         `SELECT 
           attendance_date,
@@ -86,7 +82,7 @@ export async function GET(request: NextRequest) {
           user_email,
           user_name,
           user_role,
-          created_at
+          device_timestamp
         FROM attendance 
         WHERE sevak_id = ? 
         ORDER BY attendance_date DESC`,
@@ -115,7 +111,6 @@ export async function GET(request: NextRequest) {
           .reduce((sum: number, t: any) => sum + t.points_change, 0)
       };
 
-      // Format the response
       const response = {
         success: true,
         sevakInfo: {
@@ -135,10 +130,10 @@ export async function GET(request: NextRequest) {
           user_email: row.user_email || 'system@annakut.com',
           user_name: row.user_name || 'System',
           user_role: row.user_role || 'system',
-          created_at: row.created_at,
-          // Add formatted display values
+          device_timestamp: row.device_timestamp,
+          // Display values
           display_type: row.transaction_type.replace('_', ' ').toLowerCase(),
-          display_date: row.created_at,
+          display_date: row.device_timestamp,
           is_positive: row.points_change > 0,
           formatted_change: row.points_change > 0 ? `+${row.points_change}` : row.points_change.toString()
         })),
@@ -150,7 +145,7 @@ export async function GET(request: NextRequest) {
           user_email: row.user_email || 'system@annakut.com',
           user_name: row.user_name || 'System',
           user_role: row.user_role || 'system',
-          created_at: row.created_at,
+          device_timestamp: row.device_timestamp,
           formatted_time: row.check_in_time,
           status: row.is_on_time ? 'On Time' : 'Late',
           status_color: row.is_on_time ? 'green' : 'yellow'

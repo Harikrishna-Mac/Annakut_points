@@ -325,7 +325,7 @@ export default function AttendancePage() {
               </div>
               <p className="text-slate-600 text-sm mt-4">
                 Cutoff Time:{" "}
-                <span className="font-semibold">{cutoffTime} AM</span>
+                <span className="font-semibold">{cutoffTime}</span>
               </p>
             </div>
 

@@ -35,42 +35,48 @@ export default function AddSevakPage() {
     );
   }
 
-  const handleSingleSevakSubmit = async () => {
-    if (!sevakName.trim()) {
-      setMessage('❌ Please enter a sevak name');
-      return;
+  // Update the handleSingleSevakSubmit function in app/add-sevak/page.tsx
+
+const handleSingleSevakSubmit = async () => {
+  if (!sevakName.trim()) {
+    setMessage('❌ Please enter a sevak name');
+    return;
+  }
+
+  setIsLoading(true);
+  setMessage('');
+
+  try {
+    // Capture device time
+    const deviceTime = new Date().toISOString();
+    
+    const response = await fetch('/api/create-sevak', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: sevakName.trim(),
+        deviceTime: deviceTime  // Send device time
+      })
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      setMessage(`✅ Successfully created sevak: ${result.sevak.name} (ID: ${result.sevak.sevak_id})`);
+      setLastCreatedSevak(result.sevak);
+      setSevakName('');
+    } else {
+      setMessage(`❌ ${result.error || 'Failed to create sevak'}`);
     }
-
-    setIsLoading(true);
-    setMessage('');
-
-    try {
-      const response = await fetch('/api/create-sevak', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: sevakName.trim()
-        })
-      });
-
-      const result = await response.json();
-      
-      if (response.ok) {
-        setMessage(`✅ Successfully created sevak: ${result.sevak.name} (ID: ${result.sevak.sevak_id})`);
-        setLastCreatedSevak(result.sevak);
-        setSevakName('');
-      } else {
-        setMessage(`❌ ${result.error || 'Failed to create sevak'}`);
-      }
-    } catch (error) {
-      console.error('Create sevak error:', error);
-      setMessage('❌ Network error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error('Create sevak error:', error);
+    setMessage('❌ Network error occurred');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleBulkUpload = async () => {
     if (!bulkFile) {

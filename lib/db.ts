@@ -16,8 +16,8 @@ export interface Sevak {
   name: string;
   points: number;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  device_created_at: string;
+  device_updated_at: string;
 }
 
 export interface Transaction {
@@ -31,7 +31,7 @@ export interface Transaction {
   points_before: number;
   points_after: number;
   description: string | null;
-  created_at: string;
+  device_timestamp: string;
 }
 
 export interface Attendance {
@@ -44,7 +44,7 @@ export interface Attendance {
   check_in_time: string;
   points_awarded: number;
   is_on_time: boolean;
-  created_at: string;
+  device_timestamp: string;
 }
 
 // Create database connection
@@ -62,6 +62,18 @@ function getUserInfo(user: any) {
     name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Unknown User',
     role: (user.publicMetadata?.role || 'inspector') as 'admin' | 'inspector'
   };
+}
+
+// Helper function to format device time for MySQL DATETIME
+function formatDeviceTimeForMySQL(deviceTimeISO: string): string {
+  try {
+    const date = new Date(deviceTimeISO);
+    // Format: YYYY-MM-DD HH:MM:SS
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+  } catch (error) {
+    console.error('Error formatting device time:', error);
+    throw new Error('Invalid device timestamp format');
+  }
 }
 
 // Generate next sevak ID manually
@@ -101,15 +113,21 @@ async function getSevakByQRWithConnection(connection: mysql.Connection, qrCode: 
   return rows[0] as Sevak;
 }
 
-// Add points to sevak
-export async function addPointsToSevak(qrCode: string, points: number, user: any, description?: string) {
+// Add points to sevak - DEVICE TIME ONLY
+export async function addPointsToSevak(
+  qrCode: string, 
+  points: number, 
+  user: any, 
+  deviceTimeISO: string,
+  description?: string
+) {
   const connection = await createDbConnection();
   const userInfo = getUserInfo(user);
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
   
   try {
     await connection.beginTransaction();
 
-    // Get current sevak data
     const sevak = await getSevakByQRWithConnection(connection, qrCode);
     if (!sevak) {
       throw new Error('Sevak not found');
@@ -117,16 +135,27 @@ export async function addPointsToSevak(qrCode: string, points: number, user: any
 
     const newPoints = sevak.points + points;
 
-    // Update sevak points
+    // Update sevak points with device time
     await connection.execute(
-      'UPDATE sevaks SET points = ?, updated_at = NOW() WHERE sevak_id = ?',
-      [newPoints, qrCode]
+      'UPDATE sevaks SET points = ?, device_updated_at = ? WHERE sevak_id = ?',
+      [newPoints, deviceTimestamp, qrCode]
     );
 
-    // Record transaction
+    // Record transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'ADD', points, sevak.points, newPoints, description || `Added ${points} points`]
+      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        sevak.id, 
+        userInfo.email, 
+        userInfo.name, 
+        userInfo.role, 
+        'ADD', 
+        points, 
+        sevak.points, 
+        newPoints, 
+        description || `Added ${points} points`,
+        deviceTimestamp
+      ]
     );
 
     await connection.commit();
@@ -139,15 +168,21 @@ export async function addPointsToSevak(qrCode: string, points: number, user: any
   }
 }
 
-// Deduct points from sevak
-export async function deductPointsFromSevak(qrCode: string, points: number, user: any, description?: string) {
+// Deduct points from sevak - DEVICE TIME ONLY
+export async function deductPointsFromSevak(
+  qrCode: string, 
+  points: number, 
+  user: any, 
+  deviceTimeISO: string,
+  description?: string
+) {
   const connection = await createDbConnection();
   const userInfo = getUserInfo(user);
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
   
   try {
     await connection.beginTransaction();
 
-    // Get current sevak data
     const sevak = await getSevakByQRWithConnection(connection, qrCode);
     if (!sevak) {
       throw new Error('Sevak not found');
@@ -159,16 +194,27 @@ export async function deductPointsFromSevak(qrCode: string, points: number, user
 
     const newPoints = Math.max(0, sevak.points - points);
 
-    // Update sevak points
+    // Update sevak points with device time
     await connection.execute(
-      'UPDATE sevaks SET points = ?, updated_at = NOW() WHERE sevak_id = ?',
-      [newPoints, qrCode]
+      'UPDATE sevaks SET points = ?, device_updated_at = ? WHERE sevak_id = ?',
+      [newPoints, deviceTimestamp, qrCode]
     );
 
-    // Record transaction
+    // Record transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'DEDUCT', -points, sevak.points, newPoints, description || `Deducted ${points} points`]
+      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        sevak.id, 
+        userInfo.email, 
+        userInfo.name, 
+        userInfo.role, 
+        'DEDUCT', 
+        -points, 
+        sevak.points, 
+        newPoints, 
+        description || `Deducted ${points} points`,
+        deviceTimestamp
+      ]
     );
 
     await connection.commit();
@@ -181,11 +227,17 @@ export async function deductPointsFromSevak(qrCode: string, points: number, user
   }
 }
 
-// Mark attendance
-// Update function signature to accept client time
-export async function markAttendance(qrCode: string, user: any, clientHour: number, clientMinute: number, clientTimeISO: string) {
+// Mark attendance - DEVICE TIME ONLY
+export async function markAttendance(
+  qrCode: string, 
+  user: any, 
+  clientHour: number, 
+  clientMinute: number, 
+  clientTimeISO: string
+) {
   const connection = await createDbConnection();
   const userInfo = getUserInfo(user);
+  const deviceTimestamp = formatDeviceTimeForMySQL(clientTimeISO);
   
   try {
     await connection.beginTransaction();
@@ -211,24 +263,36 @@ export async function markAttendance(qrCode: string, user: any, clientHour: numb
 
     // Use client's time for on-time check
     const { points: pointsAwarded, isOnTime } = getAttendancePointsWithClientTime(clientHour, clientMinute);
-    
-    console.log(`Attendance check (client time): ${clientHour}:${clientMinute}, isOnTime: ${isOnTime}, points: ${pointsAwarded}`);
 
     const newPoints = sevak.points + pointsAwarded;
 
+    // Update sevak with device time
     await connection.execute(
-      'UPDATE sevaks SET points = ?, updated_at = NOW() WHERE sevak_id = ?',
-      [newPoints, qrCode]
+      'UPDATE sevaks SET points = ?, device_updated_at = ? WHERE sevak_id = ?',
+      [newPoints, deviceTimestamp, qrCode]
     );
 
+    // Record attendance with device time
     await connection.execute(
-      'INSERT INTO attendance (sevak_id, user_email, user_name, user_role, attendance_date, check_in_time, points_awarded, is_on_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [sevak.id, userInfo.email, userInfo.name, userInfo.role, today, checkInTime, pointsAwarded, isOnTime]
+      'INSERT INTO attendance (sevak_id, user_email, user_name, user_role, attendance_date, check_in_time, points_awarded, is_on_time, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [sevak.id, userInfo.email, userInfo.name, userInfo.role, today, checkInTime, pointsAwarded, isOnTime, deviceTimestamp]
     );
 
+    // Record transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`]
+      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        sevak.id, 
+        userInfo.email, 
+        userInfo.name, 
+        userInfo.role, 
+        'ATTENDANCE', 
+        pointsAwarded, 
+        sevak.points, 
+        newPoints, 
+        `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`,
+        deviceTimestamp
+      ]
     );
 
     await connection.commit();
@@ -248,10 +312,11 @@ export async function markAttendance(qrCode: string, user: any, clientHour: numb
   }
 }
 
-// Create new sevak (with manual ID generation)
-export async function createSevak(name: string, user: any): Promise<Sevak> {
+// Create new sevak - DEVICE TIME ONLY
+export async function createSevak(name: string, user: any, deviceTimeISO: string): Promise<Sevak> {
   const connection = await createDbConnection();
   const userInfo = getUserInfo(user);
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
   
   try {
     await connection.beginTransaction();
@@ -259,16 +324,27 @@ export async function createSevak(name: string, user: any): Promise<Sevak> {
     // Generate next sevak ID
     const sevakId = await getNextSevakId(connection);
 
-    // Create sevak
+    // Create sevak with device timestamps
     const [result] = await connection.execute(
-      'INSERT INTO sevaks (sevak_id, name, points) VALUES (?, ?, 100)',
-      [sevakId, name.trim()]
+      'INSERT INTO sevaks (sevak_id, name, points, device_created_at, device_updated_at) VALUES (?, ?, 100, ?, ?)',
+      [sevakId, name.trim(), deviceTimestamp, deviceTimestamp]
     ) as any[];
 
-    // Create initial transaction
+    // Create initial transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [result.insertId, userInfo.email, userInfo.name, userInfo.role, 'INITIAL', 100, 0, 100, 'Initial points allocation']
+      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        result.insertId, 
+        userInfo.email, 
+        userInfo.name, 
+        userInfo.role, 
+        'INITIAL', 
+        100, 
+        0, 
+        100, 
+        'Initial points allocation',
+        deviceTimestamp
+      ]
     );
 
     await connection.commit();
@@ -302,13 +378,15 @@ export async function getLeaderboard(): Promise<any[]> {
   }
 }
 
-// Delete sevak (mark as inactive)
-export async function deleteSevak(sevakId: string): Promise<boolean> {
+// Delete sevak (mark as inactive) - DEVICE TIME
+export async function deleteSevak(sevakId: string, deviceTimeISO: string): Promise<boolean> {
   const connection = await createDbConnection();
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
+  
   try {
     const [result] = await connection.execute(
-      'UPDATE sevaks SET is_active = FALSE, updated_at = NOW() WHERE sevak_id = ?',
-      [sevakId]
+      'UPDATE sevaks SET is_active = FALSE, device_updated_at = ? WHERE sevak_id = ?',
+      [deviceTimestamp, sevakId]
     ) as any[];
 
     return result.affectedRows > 0;
@@ -330,7 +408,7 @@ export async function getSevakPointHistory(sevakId: string, page: number = 1, li
         s.sevak_id,
         s.name,
         s.points,
-        s.created_at,
+        s.device_created_at as created_at,
         COUNT(DISTINCT t.id) as total_transactions,
         COALESCE(SUM(CASE WHEN t.transaction_type = 'ADD' THEN t.points_change ELSE 0 END), 0) as total_added,
         COALESCE(SUM(CASE WHEN t.transaction_type = 'DEDUCT' THEN ABS(t.points_change) ELSE 0 END), 0) as total_deducted,
@@ -338,7 +416,7 @@ export async function getSevakPointHistory(sevakId: string, page: number = 1, li
       FROM sevaks s
       LEFT JOIN transactions t ON s.id = t.sevak_id
       WHERE s.sevak_id = ? AND s.is_active = TRUE
-      GROUP BY s.id, s.sevak_id, s.name, s.points, s.created_at
+      GROUP BY s.id, s.sevak_id, s.name, s.points, s.device_created_at
     `, [sevakId]) as any[];
 
     if (sevakRows.length === 0) {
@@ -347,7 +425,7 @@ export async function getSevakPointHistory(sevakId: string, page: number = 1, li
 
     const sevakInfo = sevakRows[0];
 
-    // Build transaction query with optional type filter
+    // Build transaction query with device_timestamp
     let transactionQuery = `
       SELECT 
         t.id,
@@ -356,7 +434,7 @@ export async function getSevakPointHistory(sevakId: string, page: number = 1, li
         t.points_before,
         t.points_after,
         t.description,
-        t.created_at,
+        t.device_timestamp,
         t.user_email,
         t.user_name,
         t.user_role
@@ -371,7 +449,7 @@ export async function getSevakPointHistory(sevakId: string, page: number = 1, li
       queryParams.push(type);
     }
 
-    transactionQuery += ` ORDER BY t.created_at DESC LIMIT ? OFFSET ?`;
+    transactionQuery += ` ORDER BY t.device_timestamp DESC LIMIT ? OFFSET ?`;
     queryParams.push(limit, offset);
 
     const [transactions] = await connection.execute(transactionQuery, queryParams) as any[];

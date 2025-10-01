@@ -5,7 +5,6 @@ import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const user = await currentUser();
     const { userId } = await auth();
     if (!userId) {
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
         { error: 'File size too large. Maximum 5MB allowed.' }, 
@@ -64,10 +63,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse CSV data - handle different line endings
+    // Parse CSV data
     const lines = fileContent
-      .replace(/\r\n/g, '\n')  // Convert Windows line endings
-      .replace(/\r/g, '\n')    // Convert Mac line endings
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
       .split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0);
@@ -79,7 +78,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if first line is header (contains 'name')
     const firstLine = lines[0].toLowerCase();
     const hasHeader = firstLine.includes('name') || firstLine.includes('sevak');
     const dataLines = hasHeader ? lines.slice(1) : lines;
@@ -91,13 +89,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Limit number of sevaks
     if (dataLines.length > 100) {
       return NextResponse.json(
         { error: 'Too many rows. Maximum 100 sevaks can be uploaded at once.' }, 
         { status: 400 }
       );
     }
+
+    // Capture device time once for the bulk upload
+    const deviceTime = new Date().toISOString();
 
     const results = {
       created: [] as any[],
@@ -112,14 +112,11 @@ export async function POST(request: NextRequest) {
       const rowNumber = i + (hasHeader ? 2 : 1);
       
       try {
-        // Handle CSV parsing - split by comma and clean
         let name: string;
         
         if (line.includes(',')) {
-          // CSV format - take first column
           name = line.split(',')[0]?.trim().replace(/"/g, '').replace(/'/g, '');
         } else {
-          // Single column format
           name = line.trim().replace(/"/g, '').replace(/'/g, '');
         }
         
@@ -144,7 +141,6 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Check for invalid characters
         if (!/^[a-zA-Z\s\u0900-\u097F.-]+$/.test(name)) {
           results.failed.push({
             row: rowNumber,
@@ -155,9 +151,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Create sevak
-        console.log(`Creating sevak: ${name}`);
-        const sevak = await createSevak(name, user);
+        // Create sevak with device time
+        const sevak = await createSevak(name, user, deviceTime);
         
         results.created.push({
           row: rowNumber,
@@ -166,8 +161,6 @@ export async function POST(request: NextRequest) {
           points: sevak.points
         });
         results.createdCount++;
-        
-        console.log(`Successfully created: ${sevak.sevak_id} - ${sevak.name}`);
         
       } catch (error: any) {
         console.error(`Error creating sevak for row ${rowNumber}:`, error);
@@ -180,8 +173,6 @@ export async function POST(request: NextRequest) {
         results.failedCount++;
       }
     }
-
-    console.log(`Bulk upload completed. Created: ${results.createdCount}, Failed: ${results.failedCount}`);
 
     return NextResponse.json({ 
       success: true, 

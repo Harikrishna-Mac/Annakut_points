@@ -5,7 +5,6 @@ import { currentUser } from '@clerk/nextjs/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const user = await currentUser();
     const { userId } = await auth();
     if (!userId) {
@@ -15,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { qrCode, points } = await request.json();
+    const { qrCode, points, deviceTime } = await request.json();
     
     // Validate input
     if (!qrCode || !points) {
@@ -25,7 +24,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate points value
+    if (!deviceTime) {
+      return NextResponse.json(
+        { error: 'Device time is required' }, 
+        { status: 400 }
+      );
+    }
+
     if (points !== 10) {
       return NextResponse.json(
         { error: 'Only 10 points can be added at a time' }, 
@@ -33,11 +38,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add points to sevak
+    // Add points with device time
     const result = await addPointsToSevak(
       qrCode, 
       points, 
-      user, 
+      user,
+      deviceTime,
       `Points added by inspector via QR scan`
     );
     
