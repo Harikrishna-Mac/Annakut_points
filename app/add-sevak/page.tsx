@@ -266,6 +266,9 @@ Radha Rani,female`;
             >
               🏆 Leaderboard
             </Link>
+            <Link href="/inspector-activity" className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors">
+              👁️ Inspector Activity
+            </Link>
           </div>
         </div>
       </div>

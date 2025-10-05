@@ -428,7 +428,7 @@ export default function LeaderboardPage() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              👨 Male (ID 1-300)
+              👨 Male
             </button>
             <button
               onClick={() => setGenderFilter('female')}
@@ -438,7 +438,7 @@ export default function LeaderboardPage() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              👩 Female (ID 301+)
+              👩 Female
             </button>
           </div>
 

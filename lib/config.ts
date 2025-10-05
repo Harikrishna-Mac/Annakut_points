@@ -13,7 +13,7 @@ export const ATTENDANCE_CONFIG = {
   
   // Time settings (24-hour format)
   ON_TIME_CUTOFF: {
-    HOUR: parseInt('8'),
+    HOUR: parseInt('11'),
     MINUTE: parseInt('30')
   },
   

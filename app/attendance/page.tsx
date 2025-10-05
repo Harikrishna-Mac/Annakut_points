@@ -224,6 +224,12 @@ export default function AttendancePage() {
                 >
                   🏆 Leaderboard
                 </Link>
+                <Link
+                  href="/inspector-activity"
+                  className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors"
+                >
+                  👁️ Inspector Activity
+                </Link>
               </>
             )}
           </div>
@@ -324,8 +330,7 @@ export default function AttendancePage() {
                 {isCurrentlyOnTime ? "🟢 On Time Period" : "🟡 Late Period"}
               </div>
               <p className="text-slate-600 text-sm mt-4">
-                Cutoff Time:{" "}
-                <span className="font-semibold">{cutoffTime}</span>
+                Cutoff Time: <span className="font-semibold">{cutoffTime}</span>
               </p>
             </div>
 
