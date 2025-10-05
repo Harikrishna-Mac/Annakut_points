@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise';
 import { getAttendancePointsWithClientTime } from './config';
+import { getMaxDailyPoints } from './config';
 
 // Database configuration
 const dbConfig = {
@@ -14,6 +15,7 @@ export interface Sevak {
   id: number;
   sevak_id: string;
   name: string;
+  gender: 'male' | 'female';
   points: number;
   is_active: boolean;
   device_created_at: string;
@@ -34,19 +36,6 @@ export interface Transaction {
   device_timestamp: string;
 }
 
-export interface Attendance {
-  id: number;
-  sevak_id: number;
-  user_email: string;
-  user_name: string;
-  user_role: 'admin' | 'inspector';
-  attendance_date: string;
-  check_in_time: string;
-  points_awarded: number;
-  is_on_time: boolean;
-  device_timestamp: string;
-}
-
 // Create database connection
 export async function createDbConnection() {
   if (!dbConfig.user || !dbConfig.password || !dbConfig.database) {
@@ -55,21 +44,19 @@ export async function createDbConnection() {
   return await mysql.createConnection(dbConfig);
 }
 
-// Helper function to get user info from Clerk user
+// Helper function to get user info
 function getUserInfo(user: any) {
   return {
     email: user.emailAddresses?.[0]?.emailAddress || 'unknown@email.com',
-    // name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Unknown User',
-    name: user.username? user.username:'Unknown User',
+    name: user.username ? user.username : 'Unknown User',
     role: (user.publicMetadata?.role || 'inspector') as 'admin' | 'inspector'
   };
 }
 
-// Helper function to format device time for MySQL DATETIME
+// Helper function to format device time for MySQL
 function formatDeviceTimeForMySQL(deviceTimeISO: string): string {
   try {
     const date = new Date(deviceTimeISO);
-    // Format: YYYY-MM-DD HH:MM:SS
     return date.toISOString().slice(0, 19).replace('T', ' ');
   } catch (error) {
     console.error('Error formatting device time:', error);
@@ -77,17 +64,114 @@ function formatDeviceTimeForMySQL(deviceTimeISO: string): string {
   }
 }
 
-// Generate next sevak ID manually
-async function getNextSevakId(connection: mysql.Connection): Promise<string> {
-  const [rows] = await connection.execute(
-    'SELECT MAX(CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED)) as max_num FROM sevaks'
-  ) as any[];
-  
-  const nextNum = (rows[0]?.max_num || 0) + 1;
-  return `ID-${nextNum.toString().padStart(4, '0')}`;
+// Generate next sevak ID based on gender
+async function getNextSevakId(connection: mysql.Connection, gender: 'male' | 'female'): Promise<string> {
+  if (gender === 'male') {
+    // Male IDs: ID-0001 to ID-0300
+    const [rows] = await connection.execute(
+      `SELECT MAX(CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED)) as max_num 
+       FROM sevaks 
+       WHERE gender = 'male' AND CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED) <= 300`
+    ) as any[];
+    
+    const nextNum = (rows[0]?.max_num || 0) + 1;
+    if (nextNum > 300) {
+      throw new Error('Male sevak ID limit reached (300 maximum)');
+    }
+    return `ID-${nextNum.toString().padStart(4, '0')}`;
+  } else {
+    // Female IDs: ID-0301 onwards
+    const [rows] = await connection.execute(
+      `SELECT MAX(CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED)) as max_num 
+       FROM sevaks 
+       WHERE gender = 'female'`
+    ) as any[];
+    
+    const nextNum = Math.max((rows[0]?.max_num || 300), 300) + 1;
+    return `ID-${nextNum.toString().padStart(4, '0')}`;
+  }
 }
 
-// Get sevak by QR code (sevak_id)
+// Check daily point limit for inspector - ONLY FOR ADD OPERATIONS
+async function checkDailyPointLimit(
+  connection: mysql.Connection, 
+  userEmail: string, 
+  sevakId: number, 
+  pointsToAdd: number,
+  actionType: 'ADD' | 'DEDUCT',
+  deviceTimeISO: string
+): Promise<boolean> {
+  const actionDate = new Date(deviceTimeISO).toISOString().split('T')[0];
+  
+  // Get max daily points from Next.js config
+  const maxDailyPoints = getMaxDailyPoints();
+  
+  console.log(`[DAILY LIMIT CHECK] Max allowed: ${maxDailyPoints}, Trying to add: ${pointsToAdd}`);
+  
+  // Get current daily total for ADD operations only
+  const [limitRows] = await connection.execute(
+    `SELECT total_points_added 
+     FROM daily_point_limits 
+     WHERE user_email = ? AND sevak_id = ? AND action_date = ?`,
+    [userEmail, sevakId, actionDate]
+  ) as any[];
+  
+  if (limitRows.length > 0) {
+    const currentAdded = limitRows[0].total_points_added || 0;
+    
+    console.log(`[DAILY LIMIT CHECK] Current added today: ${currentAdded}, After this: ${currentAdded + pointsToAdd}`);
+    
+    if (currentAdded + pointsToAdd > maxDailyPoints) {
+      throw new Error(`Daily limit reached! You can only ADD ${maxDailyPoints} points per sevak per day. Current total added today: ${currentAdded}`);
+    }
+  } else {
+    console.log(`[DAILY LIMIT CHECK] First addition today for this sevak`);
+  }
+  
+  return true;
+}
+
+// Update daily point limit tracker - ONLY FOR ADD OPERATIONS
+async function updateDailyPointLimit(
+  connection: mysql.Connection,
+  userEmail: string,
+  sevakId: number,
+  pointsChanged: number,
+  actionType: 'ADD' | 'DEDUCT',
+  deviceTimeISO: string
+) {
+  // Only track ADD operations, ignore DEDUCT
+  if (actionType !== 'ADD') return;
+  
+  const actionDate = new Date(deviceTimeISO).toISOString().split('T')[0];
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
+  
+  const [existing] = await connection.execute(
+    `SELECT * FROM daily_point_limits 
+     WHERE user_email = ? AND sevak_id = ? AND action_date = ?`,
+    [userEmail, sevakId, actionDate]
+  ) as any[];
+  
+  if (existing.length > 0) {
+    // Update existing record - only ADD points
+    await connection.execute(
+      `UPDATE daily_point_limits 
+       SET total_points_added = total_points_added + ?, last_updated = ? 
+       WHERE user_email = ? AND sevak_id = ? AND action_date = ?`,
+      [pointsChanged, deviceTimestamp, userEmail, sevakId, actionDate]
+    );
+  } else {
+    // Create new record - only ADD points
+    await connection.execute(
+      `INSERT INTO daily_point_limits 
+       (user_email, sevak_id, action_date, total_points_added, total_points_deducted, last_updated) 
+       VALUES (?, ?, ?, ?, 0, ?)`,
+      [userEmail, sevakId, actionDate, pointsChanged, deviceTimestamp]
+    );
+  }
+}
+
+// Get sevak by QR code
 export async function getSevakByQR(qrCode: string): Promise<Sevak | null> {
   const connection = await createDbConnection();
   try {
@@ -95,7 +179,6 @@ export async function getSevakByQR(qrCode: string): Promise<Sevak | null> {
       'SELECT * FROM sevaks WHERE sevak_id = ? AND is_active = TRUE',
       [qrCode]
     ) as any[];
-
     if (rows.length === 0) return null;
     return rows[0] as Sevak;
   } finally {
@@ -103,18 +186,17 @@ export async function getSevakByQR(qrCode: string): Promise<Sevak | null> {
   }
 }
 
-// Helper function to get sevak with existing connection
+// Helper to get sevak with existing connection
 async function getSevakByQRWithConnection(connection: mysql.Connection, qrCode: string): Promise<Sevak | null> {
   const [rows] = await connection.execute(
     'SELECT * FROM sevaks WHERE sevak_id = ? AND is_active = TRUE',
     [qrCode]
   ) as any[];
-
   if (rows.length === 0) return null;
   return rows[0] as Sevak;
 }
 
-// Add points to sevak - DEVICE TIME ONLY
+// Add points to sevak with daily limit check
 export async function addPointsToSevak(
   qrCode: string, 
   points: number, 
@@ -134,30 +216,29 @@ export async function addPointsToSevak(
       throw new Error('Sevak not found');
     }
 
+    // // Check daily limit ONLY for inspectors on ADD operations
+    // if (userInfo.role === 'inspector') {
+    //   await checkDailyPointLimit(connection, userInfo.email, sevak.id, points, 'ADD', deviceTimeISO);
+    // }
+
     const newPoints = sevak.points + points;
 
-    // Update sevak points with device time
     await connection.execute(
       'UPDATE sevaks SET points = ?, device_updated_at = ? WHERE sevak_id = ?',
       [newPoints, deviceTimestamp, qrCode]
     );
 
-    // Record transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        sevak.id, 
-        userInfo.email, 
-        userInfo.name, 
-        userInfo.role, 
-        'ADD', 
-        points, 
-        sevak.points, 
-        newPoints, 
-        description || `Added ${points} points`,
-        deviceTimestamp
-      ]
+      `INSERT INTO transactions 
+       (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'ADD', points, sevak.points, newPoints, description || `Added ${points} points`, deviceTimestamp]
     );
+
+    // // Update daily limit tracker ONLY for inspectors
+    // if (userInfo.role === 'inspector') {
+    //   await updateDailyPointLimit(connection, userInfo.email, sevak.id, points, 'ADD', deviceTimeISO);
+    // }
 
     await connection.commit();
     return { success: true, newPoints, previousPoints: sevak.points };
@@ -169,7 +250,7 @@ export async function addPointsToSevak(
   }
 }
 
-// Deduct points from sevak - DEVICE TIME ONLY
+// Deduct points from sevak - NO DAILY LIMIT CHECK
 export async function deductPointsFromSevak(
   qrCode: string, 
   points: number, 
@@ -189,34 +270,27 @@ export async function deductPointsFromSevak(
       throw new Error('Sevak not found');
     }
 
+    // NO DAILY LIMIT CHECK FOR DEDUCT - UNLIMITED DEDUCTIONS ALLOWED
+
     if (sevak.points < points) {
       throw new Error(`Insufficient points. Current balance: ${sevak.points}`);
     }
 
     const newPoints = Math.max(0, sevak.points - points);
 
-    // Update sevak points with device time
     await connection.execute(
       'UPDATE sevaks SET points = ?, device_updated_at = ? WHERE sevak_id = ?',
       [newPoints, deviceTimestamp, qrCode]
     );
 
-    // Record transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        sevak.id, 
-        userInfo.email, 
-        userInfo.name, 
-        userInfo.role, 
-        'DEDUCT', 
-        -points, 
-        sevak.points, 
-        newPoints, 
-        description || `Deducted ${points} points`,
-        deviceTimestamp
-      ]
+      `INSERT INTO transactions 
+       (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'DEDUCT', -points, sevak.points, newPoints, description || `Deducted ${points} points`, deviceTimestamp]
     );
+
+    // NO UPDATE TO DAILY LIMIT TRACKER FOR DEDUCT
 
     await connection.commit();
     return { success: true, newPoints, previousPoints: sevak.points };
@@ -228,7 +302,7 @@ export async function deductPointsFromSevak(
   }
 }
 
-// Mark attendance - DEVICE TIME ONLY
+// Mark attendance
 export async function markAttendance(
   qrCode: string, 
   user: any, 
@@ -248,7 +322,6 @@ export async function markAttendance(
       throw new Error('Sevak not found');
     }
 
-    // Use client's time for date/time
     const clientDate = new Date(clientTimeISO);
     const today = clientDate.toISOString().split('T')[0];
     const checkInTime = clientDate.toTimeString().split(' ')[0];
@@ -262,49 +335,30 @@ export async function markAttendance(
       throw new Error('Attendance already marked for today');
     }
 
-    // Use client's time for on-time check
     const { points: pointsAwarded, isOnTime } = getAttendancePointsWithClientTime(clientHour, clientMinute);
-
     const newPoints = sevak.points + pointsAwarded;
 
-    // Update sevak with device time
     await connection.execute(
       'UPDATE sevaks SET points = ?, device_updated_at = ? WHERE sevak_id = ?',
       [newPoints, deviceTimestamp, qrCode]
     );
 
-    // Record attendance with device time
     await connection.execute(
-      'INSERT INTO attendance (sevak_id, user_email, user_name, user_role, attendance_date, check_in_time, points_awarded, is_on_time, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO attendance 
+       (sevak_id, user_email, user_name, user_role, attendance_date, check_in_time, points_awarded, is_on_time, device_timestamp) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [sevak.id, userInfo.email, userInfo.name, userInfo.role, today, checkInTime, pointsAwarded, isOnTime, deviceTimestamp]
     );
 
-    // Record transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        sevak.id, 
-        userInfo.email, 
-        userInfo.name, 
-        userInfo.role, 
-        'ATTENDANCE', 
-        pointsAwarded, 
-        sevak.points, 
-        newPoints, 
-        `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`,
-        deviceTimestamp
-      ]
+      `INSERT INTO transactions 
+       (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sevak.id, userInfo.email, userInfo.name, userInfo.role, 'ATTENDANCE', pointsAwarded, sevak.points, newPoints, `Attendance marked - ${isOnTime ? 'On time' : 'Late'} (+${pointsAwarded} points)`, deviceTimestamp]
     );
 
     await connection.commit();
-    return { 
-      success: true, 
-      newPoints, 
-      previousPoints: sevak.points, 
-      isOnTime, 
-      pointsAwarded,
-      checkInTime 
-    };
+    return { success: true, newPoints, previousPoints: sevak.points, isOnTime, pointsAwarded, checkInTime };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -313,8 +367,8 @@ export async function markAttendance(
   }
 }
 
-// Create new sevak - DEVICE TIME ONLY
-export async function createSevak(name: string, user: any, deviceTimeISO: string): Promise<Sevak> {
+// Create new sevak with gender
+export async function createSevak(name: string, gender: 'male' | 'female', user: any, deviceTimeISO: string): Promise<Sevak> {
   const connection = await createDbConnection();
   const userInfo = getUserInfo(user);
   const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
@@ -322,35 +376,22 @@ export async function createSevak(name: string, user: any, deviceTimeISO: string
   try {
     await connection.beginTransaction();
 
-    // Generate next sevak ID
-    const sevakId = await getNextSevakId(connection);
+    const sevakId = await getNextSevakId(connection, gender);
 
-    // Create sevak with device timestamps
     const [result] = await connection.execute(
-      'INSERT INTO sevaks (sevak_id, name, points, device_created_at, device_updated_at) VALUES (?, ?, 100, ?, ?)',
-      [sevakId, name.trim(), deviceTimestamp, deviceTimestamp]
+      'INSERT INTO sevaks (sevak_id, name, gender, points, device_created_at, device_updated_at) VALUES (?, ?, ?, 100, ?, ?)',
+      [sevakId, name.trim(), gender, deviceTimestamp, deviceTimestamp]
     ) as any[];
 
-    // Create initial transaction with device time
     await connection.execute(
-      'INSERT INTO transactions (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        result.insertId, 
-        "System", 
-        "System", 
-        userInfo.role, 
-        'INITIAL', 
-        100, 
-        0, 
-        100, 
-        'Initial points allocation',
-        deviceTimestamp
-      ]
+      `INSERT INTO transactions 
+       (sevak_id, user_email, user_name, user_role, transaction_type, points_change, points_before, points_after, description, device_timestamp) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [result.insertId, "System", "System", userInfo.role, 'INITIAL', 100, 0, 100, 'Initial points allocation', deviceTimestamp]
     );
 
     await connection.commit();
 
-    // Get the created sevak
     const [rows] = await connection.execute(
       'SELECT * FROM sevaks WHERE id = ?',
       [result.insertId]
@@ -365,29 +406,64 @@ export async function createSevak(name: string, user: any, deviceTimeISO: string
   }
 }
 
-// Get all sevaks for leaderboard
-export async function getLeaderboard(): Promise<any[]> {
-  const connection = await createDbConnection();
+// Get leaderboard by gender
+export async function getLeaderboard(gender?: 'male' | 'female') {
+  const connection = await mysql.createConnection(dbConfig);
+  
   try {
-    const [rows] = await connection.execute(
-      'SELECT * FROM sevak_leaderboard ORDER BY points DESC'
-    ) as any[];
+    let query = `
+      SELECT 
+        s.id,
+        s.sevak_id,
+        s.name,
+        s.gender,
+        s.points,
+        s.is_active,
+        s.device_created_at as created_at,
+        COUNT(DISTINCT t.id) as total_transactions,
+        COUNT(DISTINCT a.id) as total_attendance_days,
+        COALESCE(SUM(CASE WHEN t.transaction_type = 'ADD' THEN t.points_change ELSE 0 END), 0) as total_added,
+        COALESCE(SUM(CASE WHEN t.transaction_type = 'DEDUCT' THEN ABS(t.points_change) ELSE 0 END), 0) as total_deducted,
+        COALESCE(SUM(CASE WHEN t.transaction_type = 'ATTENDANCE' THEN t.points_change ELSE 0 END), 0) as attendance_points,
+        COALESCE(SUM(CASE WHEN a.is_on_time = TRUE THEN 1 ELSE 0 END), 0) as on_time_days,
+        COALESCE(SUM(CASE WHEN a.is_on_time = FALSE THEN 1 ELSE 0 END), 0) as late_days
+      FROM sevaks s
+      LEFT JOIN transactions t ON s.id = t.sevak_id
+      LEFT JOIN attendance a ON s.id = a.sevak_id
+      WHERE s.is_active = TRUE
+    `;
+
+    const params: any[] = [];
+
+    // Add gender filter if provided
+    if (gender) {
+      query += ` AND s.gender = ?`;
+      params.push(gender);
+    }
+
+    query += `
+      GROUP BY s.id, s.sevak_id, s.name, s.gender, s.points, s.is_active, s.device_created_at
+      ORDER BY s.points DESC, s.name ASC
+    `;
+
+    const [rows] = await connection.execute(query, params) as [any[], any];
+    await connection.end();
 
     return rows;
-  } finally {
+  } catch (error) {
     await connection.end();
+    throw error;
   }
 }
 
-// Delete sevak (mark as inactive) - DEVICE TIME
-export async function deleteSevak(sevakId: string, deviceTimeISO: string): Promise<boolean> {
+// FULL DELETE - Permanently remove sevak
+export async function deleteSevak(sevakId: string): Promise<boolean> {
   const connection = await createDbConnection();
-  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
   
   try {
     const [result] = await connection.execute(
-      'UPDATE sevaks SET is_active = FALSE, device_updated_at = ? WHERE sevak_id = ?',
-      [deviceTimestamp, sevakId]
+      'DELETE FROM sevaks WHERE sevak_id = ?',
+      [sevakId]
     ) as any[];
 
     return result.affectedRows > 0;
@@ -396,84 +472,101 @@ export async function deleteSevak(sevakId: string, deviceTimeISO: string): Promi
   }
 }
 
-// Get point history for a specific sevak
-export async function getSevakPointHistory(sevakId: string, page: number = 1, limit: number = 10, type?: string) {
+// Update sevak information
+export async function updateSevak(sevakId: string, name: string, gender: 'male' | 'female', deviceTimeISO: string): Promise<boolean> {
   const connection = await createDbConnection();
-  const offset = (page - 1) * limit;
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
   
   try {
-    // Get sevak info with summary stats
-    const [sevakRows] = await connection.execute(`
+    const [result] = await connection.execute(
+      'UPDATE sevaks SET name = ?, gender = ?, device_updated_at = ? WHERE sevak_id = ?',
+      [name.trim(), gender, deviceTimestamp, sevakId]
+    ) as any[];
+
+    return result.affectedRows > 0;
+  } finally {
+    await connection.end();
+  }
+}
+
+// Get inspector activity (for admin view)
+export async function getInspectorActivity(startDate?: string, endDate?: string): Promise<any[]> {
+  const connection = await createDbConnection();
+  
+  try {
+    let query = 'SELECT * FROM inspector_activity';
+    const params: any[] = [];
+    
+    if (startDate && endDate) {
+      query += ' WHERE activity_date BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    }
+    
+    query += ' ORDER BY activity_date DESC, total_transactions DESC';
+    
+    const [rows] = await connection.execute(query, params) as any[];
+    return rows;
+  } finally {
+    await connection.end();
+  }
+}
+
+// Get detailed transactions by inspector
+export async function getTransactionsByInspector(userEmail: string, startDate?: string, endDate?: string): Promise<any[]> {
+  const connection = await createDbConnection();
+  
+  try {
+    let query = `
       SELECT 
-        s.id,
+        t.*,
         s.sevak_id,
-        s.name,
-        s.points,
-        s.device_created_at as created_at,
-        COUNT(DISTINCT t.id) as total_transactions,
-        COALESCE(SUM(CASE WHEN t.transaction_type = 'ADD' THEN t.points_change ELSE 0 END), 0) as total_added,
-        COALESCE(SUM(CASE WHEN t.transaction_type = 'DEDUCT' THEN ABS(t.points_change) ELSE 0 END), 0) as total_deducted,
-        COALESCE(SUM(CASE WHEN t.transaction_type = 'ATTENDANCE' THEN t.points_change ELSE 0 END), 0) as attendance_points
-      FROM sevaks s
-      LEFT JOIN transactions t ON s.id = t.sevak_id
-      WHERE s.sevak_id = ? AND s.is_active = TRUE
-      GROUP BY s.id, s.sevak_id, s.name, s.points, s.device_created_at
-    `, [sevakId]) as any[];
-
-    if (sevakRows.length === 0) {
-      throw new Error('Sevak not found');
-    }
-
-    const sevakInfo = sevakRows[0];
-
-    // Build transaction query with device_timestamp
-    let transactionQuery = `
-      SELECT 
-        t.id,
-        t.transaction_type,
-        t.points_change,
-        t.points_before,
-        t.points_after,
-        t.description,
-        t.device_timestamp,
-        t.user_email,
-        t.user_name,
-        t.user_role
+        s.name as sevak_name,
+        s.gender as sevak_gender
       FROM transactions t
-      WHERE t.sevak_id = ?
+      JOIN sevaks s ON t.sevak_id = s.id
+      WHERE t.user_email = ?
     `;
-
-    const queryParams: any[] = [sevakInfo.id];
-
-    if (type && ['ADD', 'DEDUCT', 'ATTENDANCE', 'INITIAL'].includes(type)) {
-      transactionQuery += ` AND t.transaction_type = ?`;
-      queryParams.push(type);
+    const params: any[] = [userEmail];
+    
+    if (startDate && endDate) {
+      query += ' AND DATE(t.device_timestamp) BETWEEN ? AND ?';
+      params.push(startDate, endDate);
     }
+    
+    query += ' ORDER BY t.device_timestamp DESC';
+    
+    const [rows] = await connection.execute(query, params) as any[];
+    return rows;
+  } finally {
+    await connection.end();
+  }
+}
 
-    transactionQuery += ` ORDER BY t.device_timestamp DESC LIMIT ? OFFSET ?`;
-    queryParams.push(limit, offset);
+// Get sevak by ID (for edit)
+export async function getSevakById(sevakId: string): Promise<Sevak | null> {
+  const connection = await createDbConnection();
+  try {
+    const [rows] = await connection.execute(
+      'SELECT * FROM sevaks WHERE sevak_id = ?',
+      [sevakId]
+    ) as any[];
+    if (rows.length === 0) return null;
+    return rows[0] as Sevak;
+  } finally {
+    await connection.end();
+  }
+}
 
-    const [transactions] = await connection.execute(transactionQuery, queryParams) as any[];
-
-    // Get total count for pagination
-    let countQuery = `SELECT COUNT(*) as total FROM transactions WHERE sevak_id = ?`;
-    const countParams: any[] = [sevakInfo.id];
-
-    if (type && ['ADD', 'DEDUCT', 'ATTENDANCE', 'INITIAL'].includes(type)) {
-      countQuery += ` AND transaction_type = ?`;
-      countParams.push(type);
-    }
-
-    const [countRows] = await connection.execute(countQuery, countParams) as any[];
-    const totalCount = countRows[0].total;
-
-    return {
-      sevakInfo,
-      transactions,
-      totalCount,
-      totalPages: Math.ceil(totalCount / limit)
-    };
-
+// Get system config
+export async function getSystemConfig(key: string): Promise<string | null> {
+  const connection = await createDbConnection();
+  try {
+    const [rows] = await connection.execute(
+      'SELECT config_value FROM system_config WHERE config_key = ?',
+      [key]
+    ) as any[];
+    if (rows.length === 0) return null;
+    return rows[0].config_value;
   } finally {
     await connection.end();
   }

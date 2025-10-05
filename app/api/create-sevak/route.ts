@@ -14,9 +14,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, deviceTime } = await request.json();
+    const { name, gender, deviceTime } = await request.json();
     
     // Validate input
+    if (!gender || !['male', 'female'].includes(gender)) {
+  return NextResponse.json(
+    { error: 'Valid gender (male/female) is required' }, 
+    { status: 400 }
+  );
+}
+
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Valid name is required' }, 
@@ -47,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new sevak with device time
-    const sevak = await createSevak(name.trim(), user, deviceTime);
+    const sevak = await createSevak(name.trim(), gender, user, deviceTime);
     
     return NextResponse.json({ 
       success: true, 

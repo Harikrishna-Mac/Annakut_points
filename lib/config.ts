@@ -1,5 +1,16 @@
 // Attendance Configuration - Change values here to update system-wide
 export const ATTENDANCE_CONFIG = {
+  MAX_DAILY_POINTS_PER_SEVAK: 30, // Change this value to adjust daily limit
+  
+  // Gender ID ranges
+  MALE_ID_START: 1,
+  MALE_ID_END: 300,
+  FEMALE_ID_START: 301,
+  
+  // Point system
+  POINTS_PER_ACTION: 10,
+  INITIAL_SEVAK_POINTS: 100,
+  
   // Time settings (24-hour format)
   ON_TIME_CUTOFF: {
     HOUR: parseInt('8'),
@@ -16,6 +27,21 @@ export const ATTENDANCE_CONFIG = {
   MAX_ATTEMPTS_PER_DAY: 1,
   TIMEZONE: 'Asia/Kolkata'
 };
+
+// Helper function to get max daily points
+export function getMaxDailyPoints(): number {
+  return ATTENDANCE_CONFIG.MAX_DAILY_POINTS_PER_SEVAK;
+}
+
+// Helper function to check if within male ID range
+export function isMaleIdRange(idNumber: number): boolean {
+  return idNumber >= ATTENDANCE_CONFIG.MALE_ID_START && idNumber <= ATTENDANCE_CONFIG.MALE_ID_END;
+}
+
+// Helper function to check if within female ID range
+export function isFemaleIdRange(idNumber: number): boolean {
+  return idNumber >= ATTENDANCE_CONFIG.FEMALE_ID_START;
+}
 
 // Helper function to check if current time is on-time
 // Add new function to check time with client's hour and minute
@@ -60,3 +86,6 @@ export function getFormattedCutoffTime(): string {
 
   return `${formattedHour}:${formattedMinute} ${apm}`;
 }
+
+
+export default ATTENDANCE_CONFIG;

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { qrCode, points, deviceTime } = await request.json();
-    
+
     if (!qrCode || !points) {
       return NextResponse.json({ error: 'QR code and points are required' }, { status: 400 });
     }
@@ -41,13 +41,28 @@ export async function POST(request: NextRequest) {
       newPoints: result.newPoints,
       pointsDeducted: points
     });
-  } catch (error: any) {
+  } // Change the catch block at line 39 to:
+  catch (error: any) {
     console.error('Deduct points error:', error);
 
     if (error.message === 'Sevak not found') {
-      return NextResponse.json({ error: 'Invalid QR code. Sevak not found.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Invalid QR code. Sevak not found.' },
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ error: 'Failed to deduct points. Please try again.' }, { status: 500 });
+    // Handle daily limit errors
+    if (error.message.includes('Daily limit reached')) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 429 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: error.message || 'Failed to deduct points. Please try again.' },
+      { status: 500 }
+    );
   }
 }

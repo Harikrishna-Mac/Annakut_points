@@ -1,9 +1,8 @@
-// Replace the entire file with this:
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteSevak } from '@/lib/db';
+import { getSevakById } from '@/lib/db';
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -13,9 +12,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { sevakId } = await request.json();
+    const { searchParams } = new URL(request.url);
+    const sevakId = searchParams.get('sevakId');
 
-    // Validate input
     if (!sevakId) {
       return NextResponse.json(
         { error: 'Sevak ID is required' },
@@ -23,10 +22,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // FULL DELETE from database (CASCADE removes all related records)
-    const success = await deleteSevak(sevakId);
+    const sevak = await getSevakById(sevakId);
     
-    if (!success) {
+    if (!sevak) {
       return NextResponse.json(
         { error: 'Sevak not found' },
         { status: 404 }
@@ -35,13 +33,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Sevak ${sevakId} permanently deleted from database`
+      sevak
     });
   } catch (error: any) {
-    console.error('Delete sevak error:', error);
-
+    console.error('Get sevak error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete sevak. Please try again.' },
+      { error: 'Failed to fetch sevak' },
       { status: 500 }
     );
   }

@@ -55,19 +55,28 @@ export async function POST(request: NextRequest) {
       pointsAdded: points
     });
     
-  } catch (error: any) {
-    console.error('Add points error:', error);
-    
-    if (error.message === 'Sevak not found') {
-      return NextResponse.json(
-        { error: 'Invalid QR code. Sevak not found.' }, 
-        { status: 404 }
-      );
-    }
-    
+  }
+  catch (error: any) {
+  console.error('Add points error:', error);
+  
+  if (error.message === 'Sevak not found') {
     return NextResponse.json(
-      { error: 'Failed to add points. Please try again.' }, 
-      { status: 500 }
+      { error: 'Invalid QR code. Sevak not found.' }, 
+      { status: 404 }
     );
   }
+  
+  // Handle daily limit errors
+  if (error.message.includes('Daily limit reached')) {
+    return NextResponse.json(
+      { error: error.message }, 
+      { status: 429 } // 429 = Too Many Requests
+    );
+  }
+  
+  return NextResponse.json(
+    { error: error.message || 'Failed to add points. Please try again.' }, 
+    { status: 500 }
+  );
+}
 }

@@ -4,7 +4,6 @@ import { getLeaderboard } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json(
@@ -13,13 +12,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get leaderboard data
-    const sevaks = await getLeaderboard();
+    // Get gender filter from query parameters
+    const { searchParams } = new URL(request.url);
+    const gender = searchParams.get('gender') as 'male' | 'female' | null;
+
+    // Get leaderboard data with optional gender filter
+    const sevaks = await getLeaderboard(gender || undefined);
     
     return NextResponse.json({ 
       success: true, 
       sevaks: sevaks,
       totalCount: sevaks.length,
+      gender: gender || 'all',
       timestamp: new Date().toISOString()
     });
     

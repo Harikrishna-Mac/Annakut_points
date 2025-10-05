@@ -1,21 +1,21 @@
-'use client';
-import { useState, useRef } from 'react';
-import { UserButton, useUser } from '@clerk/nextjs';
-import Link from 'next/link';
+"use client";
+import { useState, useRef } from "react";
+import { UserButton, useUser } from "@clerk/nextjs";
+import Link from "next/link";
 
 // import { getUserRole, isAdmin } from '@/lib/roles';
 
 export default function AddSevakPage() {
   const { user, isLoaded } = useUser();
-  const [sevakName, setSevakName] = useState('');
+  const [sevakName, setSevakName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [lastCreatedSevak, setLastCreatedSevak] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const isAdmin = user?.publicMetadata?.role === 'admin';
+  const [sevakGender, setSevakGender] = useState<"male" | "female">("male");
+  const isAdmin = user?.publicMetadata?.role === "admin";
 
   // Redirect if not admin
   if (isLoaded && !isAdmin) {
@@ -25,7 +25,9 @@ export default function AddSevakPage() {
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">🚫</span>
           </div>
-          <h1 className="text-2xl font-bold text-red-800 mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-red-800 mb-2">
+            Access Denied
+          </h1>
           <p className="text-red-600 mb-4">Only admins can access this page.</p>
           <Link href="/dashboard" className="text-blue-600 hover:underline">
             Return to Dashboard
@@ -37,85 +39,96 @@ export default function AddSevakPage() {
 
   // Update the handleSingleSevakSubmit function in app/add-sevak/page.tsx
 
-const handleSingleSevakSubmit = async () => {
-  if (!sevakName.trim()) {
-    setMessage('❌ Please enter a sevak name');
-    return;
-  }
-
-  setIsLoading(true);
-  setMessage('');
-
-  try {
-    // Capture device time
-    const deviceTime = new Date().toISOString();
-    
-    const response = await fetch('/api/create-sevak', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: sevakName.trim(),
-        deviceTime: deviceTime  // Send device time
-      })
-    });
-
-    const result = await response.json();
-    
-    if (response.ok) {
-      setMessage(`✅ Successfully created sevak: ${result.sevak.name} (ID: ${result.sevak.sevak_id})`);
-      setLastCreatedSevak(result.sevak);
-      setSevakName('');
-    } else {
-      setMessage(`❌ ${result.error || 'Failed to create sevak'}`);
+  const handleSingleSevakSubmit = async () => {
+    if (!sevakName.trim()) {
+      setMessage("❌ Please enter a sevak name");
+      return;
     }
-  } catch (error) {
-    console.error('Create sevak error:', error);
-    setMessage('❌ Network error occurred');
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    setIsLoading(true);
+    setMessage("");
+
+    try {
+      // Capture device time
+      const deviceTime = new Date().toISOString();
+
+      const response = await fetch("/api/create-sevak", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: sevakName.trim(),
+          gender: sevakGender,
+          deviceTime: deviceTime,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setMessage(
+          `✅ Successfully created sevak: ${result.sevak.name} (ID: ${result.sevak.sevak_id})`
+        );
+        setLastCreatedSevak(result.sevak);
+        setSevakName("");
+      } else {
+        setMessage(`❌ ${result.error || "Failed to create sevak"}`);
+      }
+    } catch (error) {
+      console.error("Create sevak error:", error);
+      setMessage("❌ Network error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleBulkUpload = async () => {
     if (!bulkFile) {
-      setMessage('❌ Please select a file to upload');
+      setMessage("❌ Please select a file to upload");
       return;
     }
 
     // Validate file type
-    if (!bulkFile.name.endsWith('.csv') && !bulkFile.name.endsWith('.xlsx') && !bulkFile.name.endsWith('.xls')) {
-      setMessage('❌ Please upload a CSV or Excel file');
+    if (
+      !bulkFile.name.endsWith(".csv") &&
+      !bulkFile.name.endsWith(".xlsx") &&
+      !bulkFile.name.endsWith(".xls")
+    ) {
+      setMessage("❌ Please upload a CSV or Excel file");
       return;
     }
 
     setIsBulkUploading(true);
-    setMessage('');
+    setMessage("");
 
     try {
       const formData = new FormData();
-      formData.append('file', bulkFile);
+      formData.append("file", bulkFile);
 
-      const response = await fetch('/api/bulk-create-sevaks', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/bulk-create-sevaks", {
+        method: "POST",
+        body: formData,
       });
 
       const result = await response.json();
-      
+
       if (response.ok) {
-        setMessage(`✅ Successfully created ${result.createdCount} sevaks! Failed: ${result.failedCount || 0}`);
+        setMessage(
+          `✅ Successfully created ${result.createdCount} sevaks! Failed: ${
+            result.failedCount || 0
+          }`
+        );
         setBulkFile(null);
         if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+          fileInputRef.current.value = "";
         }
       } else {
-        setMessage(`❌ ${result.error || 'Failed to upload sevaks'}`);
+        setMessage(`❌ ${result.error || "Failed to upload sevaks"}`);
       }
     } catch (error) {
-      console.error('Bulk upload error:', error);
-      setMessage('❌ Network error occurred during bulk upload');
+      console.error("Bulk upload error:", error);
+      setMessage("❌ Network error occurred during bulk upload");
     } finally {
       setIsBulkUploading(false);
     }
@@ -123,35 +136,35 @@ const handleSingleSevakSubmit = async () => {
 
   const downloadQRCode = async (sevakId: string, sevakName: string) => {
     try {
-      const response = await fetch('/api/generate-qr', {
-        method: 'POST',
+      const response = await fetch("/api/generate-qr", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           sevakId,
-          sevakName
-        })
+          sevakName,
+        }),
       });
 
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
+        const a = document.createElement("a");
+        a.style.display = "none";
         a.href = url;
-        a.download = `${sevakId}_${sevakName.replace(/\s+/g, '_')}_QR.pdf`;
+        a.download = `${sevakId}_${sevakName.replace(/\s+/g, "_")}_QR.pdf`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         setMessage(`✅ QR code downloaded for ${sevakName}!`);
       } else {
         const result = await response.json();
-        setMessage(`❌ ${result.error || 'Failed to generate QR code'}`);
+        setMessage(`❌ ${result.error || "Failed to generate QR code"}`);
       }
     } catch (error) {
-      console.error('QR download error:', error);
-      setMessage('❌ Failed to download QR code');
+      console.error("QR download error:", error);
+      setMessage("❌ Failed to download QR code");
     }
   };
 
@@ -163,31 +176,32 @@ const handleSingleSevakSubmit = async () => {
   };
 
   const downloadSampleFile = () => {
-    const csvContent = `name
-Rajesh Kumar
-Priya Sharma
-Amit Patel
-Sunita Devi
-Mohan Singh
-Geeta Kumari
-Ravi Shankar
-Sita Ram
-Krishna Dev
-Radha Rani`;
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'sample_sevaks.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    setMessage('✅ Sample CSV file downloaded! Check your downloads folder.');
-  };
+  const csvContent = `name,gender
+Rajesh Kumar,male
+Priya Sharma,female
+Amit Patel,male
+Sunita Devi,female
+Mohan Singh,male
+Geeta Kumari,female
+Ravi Shankar,male
+Sita Ram,female
+Krishna Dev,male
+Radha Rani,female`;
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", "sample_sevaks.csv");
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  setMessage("✅ Sample CSV file downloaded! Check your downloads folder.");
+};
+
 
   if (!isLoaded) {
     return (
@@ -212,11 +226,11 @@ Radha Rani`;
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <UserButton 
+              <UserButton
                 appearance={{
                   elements: {
-                    userButtonAvatarBox: "w-10 h-10"
-                  }
+                    userButtonAvatarBox: "w-10 h-10",
+                  },
                 }}
               />
             </div>
@@ -261,15 +275,17 @@ Radha Rani`;
         {/* Message Display */}
         {message && (
           <div className="mb-8">
-            <div className={`p-4 rounded-2xl border ${
-              message.includes('✅') 
-                ? 'bg-green-50 border-green-200 text-green-700' 
-                : 'bg-red-50 border-red-200 text-red-700'
-            }`}>
+            <div
+              className={`p-4 rounded-2xl border ${
+                message.includes("✅")
+                  ? "bg-green-50 border-green-200 text-green-700"
+                  : "bg-red-50 border-red-200 text-red-700"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <p className="font-medium">{message}</p>
                 <button
-                  onClick={() => setMessage('')}
+                  onClick={() => setMessage("")}
                   className="text-slate-400 hover:text-slate-600 text-xl"
                 >
                   ×
@@ -284,9 +300,12 @@ Radha Rani`;
           <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
             <span className="text-3xl">👥</span>
           </div>
-          <h2 className="text-3xl font-bold text-slate-800 mb-4">Add New Sevak</h2>
+          <h2 className="text-3xl font-bold text-slate-800 mb-4">
+            Add New Sevak
+          </h2>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            Create new sevak profiles individually or upload multiple sevaks using a CSV/Excel file.
+            Create new sevak profiles individually or upload multiple sevaks
+            using a CSV/Excel file.
           </p>
         </div>
 
@@ -297,19 +316,50 @@ Radha Rani`;
               <span className="mr-3">👤</span>
               Add Single Sevak
             </h3>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Sevak Name *
+
                 </label>
+                <br />
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Gender *
+                  </label>
+                  <div className="flex text-black space-x-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="male"
+                        checked={sevakGender === "male"}
+                        onChange={(e) => setSevakGender("male")}
+                        className="mr-2"
+                      />
+                      Male
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="female"
+                        checked={sevakGender === "female"}
+                        onChange={(e) => setSevakGender("female")}
+                        className="mr-2"
+                      />
+                      Female
+                    </label>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={sevakName}
                   onChange={(e) => setSevakName(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-slate-800"
                   placeholder="Enter sevak's full name"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSingleSevakSubmit()}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && handleSingleSevakSubmit()
+                  }
                 />
               </div>
 
@@ -324,7 +374,7 @@ Radha Rani`;
                     <span>Creating Sevak...</span>
                   </div>
                 ) : (
-                  '➕ Create Sevak'
+                  "➕ Create Sevak"
                 )}
               </button>
             </div>
@@ -336,7 +386,7 @@ Radha Rani`;
               <span className="mr-3">📂</span>
               Bulk Upload Sevaks
             </h3>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -372,7 +422,7 @@ Radha Rani`;
                       <span className="text-sm">Uploading...</span>
                     </div>
                   ) : (
-                    '⬆️ Upload'
+                    "⬆️ Upload"
                   )}
                 </button>
               </div>
@@ -389,12 +439,23 @@ Radha Rani`;
             </h4>
             <div className="bg-white rounded-xl p-4 flex items-center justify-between">
               <div>
-                <p className="font-semibold text-slate-800">{lastCreatedSevak.name}</p>
-                <p className="text-slate-600">ID: {lastCreatedSevak.sevak_id}</p>
-                <p className="text-green-600 text-sm">Points: {lastCreatedSevak.points}</p>
+                <p className="font-semibold text-slate-800">
+                  {lastCreatedSevak.name}
+                </p>
+                <p className="text-slate-600">
+                  ID: {lastCreatedSevak.sevak_id}
+                </p>
+                <p className="text-green-600 text-sm">
+                  Points: {lastCreatedSevak.points}
+                </p>
               </div>
               <button
-                onClick={() => downloadQRCode(lastCreatedSevak.sevak_id, lastCreatedSevak.name)}
+                onClick={() =>
+                  downloadQRCode(
+                    lastCreatedSevak.sevak_id,
+                    lastCreatedSevak.name
+                  )
+                }
                 className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-medium transition-colors duration-200 flex items-center space-x-2"
               >
                 <span>📱</span>
