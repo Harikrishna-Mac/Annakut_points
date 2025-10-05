@@ -918,7 +918,7 @@ export default function LeaderboardPage() {
                   <tr>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Rank</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-700">Sevak</th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">Gender</th>
+                    {/* <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">Gender</th> */}
                     <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">Points</th>
                     <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">Attendance</th>
                     <th className="px-6 py-4 text-center text-sm font-semibold text-slate-700">Actions</th>
@@ -936,7 +936,7 @@ export default function LeaderboardPage() {
                           <div className="text-sm text-slate-500">{sevak.sevak_id}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      {/* <td className="px-6 py-4 text-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                           sevak.gender === 'male' 
                             ? 'bg-blue-100 text-blue-700' 
@@ -944,7 +944,7 @@ export default function LeaderboardPage() {
                         }`}>
                           {sevak.gender === 'male' ? '👨 Male' : '👩 Female'}
                         </span>
-                      </td>
+                      </td> */}
                       <td className="px-6 py-4 text-center">
                         <div className={`text-2xl font-bold ${getPointsColor(sevak.points)}`}>
                           {sevak.points}
