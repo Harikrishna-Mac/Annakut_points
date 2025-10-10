@@ -36,6 +36,26 @@ export interface Transaction {
   device_timestamp: string;
 }
 
+// Add these interfaces at the top with other interfaces
+
+export interface Feedback {
+  id: number;
+  sevak_id: number;
+  reviewer_email: string;
+  reviewer_name: string;
+  reviewer_role: 'admin' | 'inspector';
+  feedback_text: string;
+  device_timestamp: string;
+  created_at: string;
+}
+
+export interface FeedbackWithSevak extends Feedback {
+  sevak_name: string;
+  sevak_qr_id: string;
+  sevak_gender: 'male' | 'female';
+  sevak_points: number;
+}
+
 // Create database connection
 export async function createDbConnection() {
   if (!dbConfig.user || !dbConfig.password || !dbConfig.database) {
@@ -302,6 +322,142 @@ export async function deductPointsFromSevak(
   }
 }
 
+export async function createFeedback(
+  qrCode: string,
+  feedbackText: string,
+  user: any,
+  deviceTimeISO: string
+): Promise<{ success: boolean; feedback_id: number }> {
+  const connection = await createDbConnection();
+  const userInfo = getUserInfo(user);
+  const deviceTimestamp = formatDeviceTimeForMySQL(deviceTimeISO);
+
+  try {
+    await connection.beginTransaction();
+
+    // Get sevak
+    const sevak = await getSevakByQRWithConnection(connection, qrCode);
+    if (!sevak) {
+      throw new Error('Sevak not found');
+    }
+
+    // Validate feedback text
+    if (!feedbackText || feedbackText.trim().length === 0) {
+      throw new Error('Feedback text cannot be empty');
+    }
+
+    if (feedbackText.trim().length > 1000) {
+      throw new Error('Feedback text is too long (max 1000 characters)');
+    }
+
+    // Insert feedback
+    const [result] = await connection.execute(
+      `INSERT INTO feedback 
+       (sevak_id, reviewer_email, reviewer_name, reviewer_role, feedback_text, device_timestamp) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [sevak.id, userInfo.email, userInfo.name, userInfo.role, feedbackText.trim(), deviceTimestamp]
+    ) as any[];
+
+    await connection.commit();
+    return { success: true, feedback_id: result.insertId };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    await connection.end();
+  }
+}
+
+// Get all feedback grouped by sevak with gender filter
+export async function getFeedbackBySevaks(gender?: 'male' | 'female'): Promise<any[]> {
+  const connection = await createDbConnection();
+
+  try {
+    let query = `
+      SELECT 
+        s.id as sevak_internal_id,
+        s.sevak_id,
+        s.name as sevak_name,
+        s.gender as sevak_gender,
+        s.points as sevak_points,
+        COUNT(f.id) as feedback_count,
+        MAX(f.device_timestamp) as latest_feedback_time
+      FROM sevaks s
+      INNER JOIN feedback f ON s.id = f.sevak_id
+      WHERE s.is_active = TRUE
+    `;
+
+    const params: any[] = [];
+
+    if (gender) {
+      query += ` AND s.gender = ?`;
+      params.push(gender);
+    }
+
+    query += `
+      GROUP BY s.id, s.sevak_id, s.name, s.gender, s.points
+      ORDER BY latest_feedback_time DESC, feedback_count DESC
+    `;
+
+    const [rows] = await connection.execute(query, params) as any[];
+    return rows;
+  } finally {
+    await connection.end();
+  }
+}
+
+// Get all feedback for a specific sevak
+export async function getFeedbackForSevak(sevakId: string): Promise<FeedbackWithSevak[]> {
+  const connection = await createDbConnection();
+
+  try {
+    const query = `
+      SELECT 
+        f.*,
+        s.name as sevak_name,
+        s.sevak_id as sevak_qr_id,
+        s.gender as sevak_gender,
+        s.points as sevak_points
+      FROM feedback f
+      JOIN sevaks s ON f.sevak_id = s.id
+      WHERE s.sevak_id = ?
+      ORDER BY f.device_timestamp DESC
+    `;
+
+    const [rows] = await connection.execute(query, [sevakId]) as any[];
+    return rows as FeedbackWithSevak[];
+  } finally {
+    await connection.end();
+  }
+}
+
+// Get feedback statistics
+export async function getFeedbackStats(): Promise<{
+  total_feedback: number;
+  total_sevaks_with_feedback: number;
+  male_sevaks_feedback: number;
+  female_sevaks_feedback: number;
+}> {
+  const connection = await createDbConnection();
+
+  try {
+    const [stats] = await connection.execute(`
+      SELECT 
+        COUNT(DISTINCT f.id) as total_feedback,
+        COUNT(DISTINCT f.sevak_id) as total_sevaks_with_feedback,
+        COUNT(DISTINCT CASE WHEN s.gender = 'male' THEN f.sevak_id END) as male_sevaks_feedback,
+        COUNT(DISTINCT CASE WHEN s.gender = 'female' THEN f.sevak_id END) as female_sevaks_feedback
+      FROM feedback f
+      JOIN sevaks s ON f.sevak_id = s.id
+      WHERE s.is_active = TRUE
+    `) as any[];
+
+    return stats[0];
+  } finally {
+    await connection.end();
+  }
+}
+
 // Mark attendance
 export async function markAttendance(
   qrCode: string, 
@@ -490,19 +646,63 @@ export async function updateSevak(sevakId: string, name: string, gender: 'male' 
 }
 
 // Get inspector activity (for admin view)
+// export async function getInspectorActivity(startDate?: string, endDate?: string): Promise<any[]> {
+//   const connection = await createDbConnection();
+  
+//   try {
+//     let query = 'SELECT * FROM inspector_activity';
+//     const params: any[] = [];
+    
+//     if (startDate && endDate) {
+//       query += ' WHERE activity_date BETWEEN ? AND ?';
+//       params.push(startDate, endDate);
+//     }
+    
+//     query += ' ORDER BY activity_date DESC, total_transactions DESC';
+    
+//     const [rows] = await connection.execute(query, params) as any[];
+//     return rows;
+//   } finally {
+//     await connection.end();
+//   }
+// }
+// Replace the existing getInspectorActivity function in lib/db.ts with this:
+
+// Get inspector activity (for admin view) - AGGREGATED BY INSPECTOR
+// Replace the existing getInspectorActivity function in lib/db.ts with this:
+
+// Get inspector activity (for admin view) - AGGREGATED BY INSPECTOR
 export async function getInspectorActivity(startDate?: string, endDate?: string): Promise<any[]> {
   const connection = await createDbConnection();
   
   try {
-    let query = 'SELECT * FROM inspector_activity';
+    let query = `
+      SELECT 
+        user_email,
+        user_name,
+        user_role,
+        COUNT(DISTINCT sevak_id) as unique_sevaks,
+        COUNT(*) as total_transactions,
+        COALESCE(SUM(CASE WHEN transaction_type = 'ADD' THEN points_change ELSE 0 END), 0) as total_added,
+        COALESCE(SUM(CASE WHEN transaction_type = 'DEDUCT' THEN ABS(points_change) ELSE 0 END), 0) as total_deducted,
+        COALESCE(SUM(CASE WHEN transaction_type = 'ATTENDANCE' THEN points_change ELSE 0 END), 0) as attendance_points,
+        MIN(DATE(device_timestamp)) as first_activity_date,
+        MAX(DATE(device_timestamp)) as last_activity_date
+      FROM transactions
+      WHERE user_email != 'System' AND user_name != 'System'
+    `;
+    
     const params: any[] = [];
     
     if (startDate && endDate) {
-      query += ' WHERE activity_date BETWEEN ? AND ?';
+      query += ' AND DATE(device_timestamp) BETWEEN ? AND ?';
       params.push(startDate, endDate);
     }
     
-    query += ' ORDER BY activity_date DESC, total_transactions DESC';
+    query += ` 
+      GROUP BY user_email, user_name, user_role
+      ORDER BY total_transactions DESC, user_name ASC
+    `;
     
     const [rows] = await connection.execute(query, params) as any[];
     return rows;

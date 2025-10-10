@@ -228,7 +228,13 @@ export default function AttendancePage() {
                   href="/inspector-activity"
                   className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors"
                 >
-                  👁️ Inspector Activity
+                  👁️ User Activity
+                </Link>
+                <Link
+                  href="/sevak-feedback"
+                  className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors"
+                >
+                  💬 Sevak Feedback
                 </Link>
               </>
             )}

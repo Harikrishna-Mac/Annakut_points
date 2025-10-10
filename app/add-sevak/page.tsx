@@ -176,7 +176,7 @@ export default function AddSevakPage() {
   };
 
   const downloadSampleFile = () => {
-  const csvContent = `name,gender
+    const csvContent = `name,gender
 Rajesh Kumar,male
 Priya Sharma,female
 Amit Patel,male
@@ -188,20 +188,19 @@ Sita Ram,female
 Krishna Dev,male
 Radha Rani,female`;
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", "sample_sevaks.csv");
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "sample_sevaks.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 
-  setMessage("✅ Sample CSV file downloaded! Check your downloads folder.");
-};
-
+    setMessage("✅ Sample CSV file downloaded! Check your downloads folder.");
+  };
 
   if (!isLoaded) {
     return (
@@ -266,8 +265,17 @@ Radha Rani,female`;
             >
               🏆 Leaderboard
             </Link>
-            <Link href="/inspector-activity" className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors">
-              👁️ Inspector Activity
+            <Link
+              href="/inspector-activity"
+              className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors"
+            >
+              👁️ User Activity
+            </Link>
+            <Link
+              href="/sevak-feedback"
+              className="py-4 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300 font-medium whitespace-nowrap transition-colors"
+            >
+              💬 Sevak Feedback
             </Link>
           </div>
         </div>
@@ -324,7 +332,6 @@ Radha Rani,female`;
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Sevak Name *
-
                 </label>
                 <br />
                 <div className="mb-4">
