@@ -394,7 +394,7 @@ export default function SevakFeedbackPage() {
           <p className="text-slate-600 max-w-2xl mx-auto">View all feedback and reviews submitted for sevaks.</p>
         </div>
 
-        {stats && (
+        {/* {stats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 text-center border border-white/20">
               <div className="text-2xl font-bold text-purple-600 mb-1">{stats.total_feedback}</div>
@@ -413,7 +413,7 @@ export default function SevakFeedbackPage() {
               <div className="text-slate-600 text-sm">Female Sevaks</div>
             </div>
           </div>
-        )}
+        )} */}
 
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-8 border border-white/20">
           <div className="flex items-center justify-center space-x-4 mb-6">
@@ -425,7 +425,7 @@ export default function SevakFeedbackPage() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              👥 All Sevaks
+              All Sevaks
             </button>
             <button
               onClick={() => setGenderFilter('male')}
@@ -435,7 +435,7 @@ export default function SevakFeedbackPage() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              👨 Male
+              Male
             </button>
             <button
               onClick={() => setGenderFilter('female')}
@@ -445,7 +445,7 @@ export default function SevakFeedbackPage() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              👩 Female
+              Female
             </button>
           </div>
 

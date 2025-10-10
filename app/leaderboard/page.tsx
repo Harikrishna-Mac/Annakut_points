@@ -902,7 +902,7 @@ export default function LeaderboardPage() {
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              👥 All Sevaks
+              All Sevaks
             </button>
             <button
               onClick={() => setGenderFilter("male")}
@@ -912,7 +912,7 @@ export default function LeaderboardPage() {
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              👨 Male
+              Male
             </button>
             <button
               onClick={() => setGenderFilter("female")}
@@ -922,7 +922,7 @@ export default function LeaderboardPage() {
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              👩 Female
+              Female
             </button>
           </div>
 
