@@ -462,7 +462,7 @@ export default function InspectorActivityPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-slate-800">
-                Detailed Transactions for {selectedInspector}
+                {selectedInspector}
               </h3>
               <button
                 onClick={() => {
