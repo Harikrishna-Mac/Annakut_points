@@ -87,27 +87,42 @@ function formatDeviceTimeForMySQL(deviceTimeISO: string): string {
 // Generate next sevak ID based on gender
 async function getNextSevakId(connection: mysql.Connection, gender: 'male' | 'female'): Promise<string> {
   if (gender === 'male') {
-    // Male IDs: ID-0001 to ID-0300
+    // Male IDs: ID-0001 to ID-0300, then ID-0501 onwards
     const [rows] = await connection.execute(
       `SELECT MAX(CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED)) as max_num 
        FROM sevaks 
-       WHERE gender = 'male' AND CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED) <= 300`
+       WHERE gender = 'male'`
     ) as any[];
     
-    const nextNum = (rows[0]?.max_num || 0) + 1;
-    if (nextNum > 300) {
-      throw new Error('Male sevak ID limit reached (300 maximum)');
+    const maxNum = rows[0]?.max_num || 0;
+    
+    let nextNum: number;
+    if (maxNum < 300) {
+      // Still in the first range (1-300)
+      nextNum = maxNum + 1;
+    } else if (maxNum >= 300 && maxNum < 500) {
+      // First range is full, jump to 501
+      nextNum = 501;
+    } else {
+      // Already in second range (501+), continue incrementing
+      nextNum = maxNum + 1;
     }
+    
     return `ID-${nextNum.toString().padStart(4, '0')}`;
   } else {
-    // Female IDs: ID-0301 onwards
+    // Female IDs: ID-0301 to ID-0500
     const [rows] = await connection.execute(
       `SELECT MAX(CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED)) as max_num 
        FROM sevaks 
-       WHERE gender = 'female'`
+       WHERE gender = 'female' AND CAST(SUBSTRING(sevak_id, 4) AS UNSIGNED) <= 500`
     ) as any[];
     
     const nextNum = Math.max((rows[0]?.max_num || 300), 300) + 1;
+    
+    if (nextNum > 500) {
+      throw new Error('Female sevak ID limit reached (500 maximum)');
+    }
+    
     return `ID-${nextNum.toString().padStart(4, '0')}`;
   }
 }
