@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Footer from "@/components/Footer";
+import Appcloser from "@/components/appcloser";
 import Head from 'next/head'
 
 const inter = Inter({ subsets: ["latin"] });
@@ -33,8 +34,9 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-red-50`}>
         {/* ✅ Clerk should wrap inside body */}
         <ClerkProvider>
-          {children}
-          <Footer />
+          <Appcloser/>
+          {/* {children}gitgit
+          <Footer /> */}
         </ClerkProvider>
       </body>
     </html>
